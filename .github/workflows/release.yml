@@ -1,0 +1,292 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (for example: v1.0.0)"
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name || github.event.inputs.tag || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "20"
+  JAVA_VERSION: "17"
+  ANDROID_NDK_VERSION: "27.0.12077973"
+
+jobs:
+  create-release:
+    name: Create Draft Release
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      release_id: ${{ steps.release.outputs.id }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create draft GitHub release
+        id: release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ChatBot ${{ steps.meta.outputs.tag }}
+          draft: true
+          prerelease: false
+          body: |
+            ## ChatBot ${{ steps.meta.outputs.tag }}
+
+            This draft release is assembled by GitHub Actions.
+
+            ### Desktop
+            - Windows x64
+            - macOS x64
+            - macOS arm64
+            - Linux x64
+            - Linux arm64 (when the ARM runner is available)
+
+            ### Mobile
+            - Android APK
+            - Android AAB
+            - Android split-per-ABI APKs
+            - iOS unsigned IPA shell
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-desktop:
+    name: Desktop · ${{ matrix.label }}
+    needs: create-release
+    if: ${{ matrix.public_only != true || github.event.repository.private == false }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: windows-x64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - label: macos-x64
+            runner: macos-latest
+            target: x86_64-apple-darwin
+          - label: macos-arm64
+            runner: macos-latest
+            target: aarch64-apple-darwin
+          - label: linux-x64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - label: linux-arm64
+            runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            public_only: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Restore Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install Linux system dependencies
+        if: ${{ startsWith(matrix.runner, 'ubuntu') }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libgtk-3-dev \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and upload desktop bundles
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: ${{ needs.create-release.outputs.tag }}
+          args: --target ${{ matrix.target }}
+
+  build-android:
+    name: Android · APK + AAB
+    needs: create-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+
+      - name: Restore Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;${ANDROID_NDK_VERSION}"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Validate Android signing secrets
+        shell: bash
+        run: |
+          test -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}"
+          test -n "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          test -n "${{ secrets.ANDROID_KEY_ALIAS }}"
+          test -n "${{ secrets.ANDROID_KEY_PASSWORD }}"
+
+      - name: Decode Android keystore
+        shell: bash
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "${{ github.workspace }}/ChatBot-release.keystore"
+
+      - name: Initialize Android project glue
+        run: npx tauri android init --ci
+
+      - name: Build Android bundles
+        env:
+          NDK_HOME: ${{ env.ANDROID_SDK_ROOT }}/ndk/${{ env.ANDROID_NDK_VERSION }}
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/ChatBot-release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: npx tauri android build --apk --aab --split-per-abi --ci
+
+      - name: Collect Android artifacts
+        shell: bash
+        run: |
+          mkdir -p dist/android-release
+          while IFS= read -r file; do
+            rel="${file#src-tauri/gen/android/app/build/outputs/}"
+            name="${rel//\//-}"
+            cp "$file" "dist/android-release/$name"
+          done < <(find src-tauri/gen/android/app/build/outputs -type f \( -name "*.apk" -o -name "*.aab" \) | sort)
+          ls -lah dist/android-release
+
+      - name: Upload Android workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-bundles
+          path: dist/android-release/*
+          if-no-files-found: error
+
+      - name: Upload Android assets to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${{ needs.create-release.outputs.tag }}"
+          for file in dist/android-release/*; do
+            gh release upload "$TAG" "$file" --clobber
+          done
+
+  build-ios-unsigned-ipa:
+    name: iOS · unsigned IPA
+    needs: create-release
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Restore Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build unsigned iOS IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.create-release.outputs.tag }}"
+          OUT_DIR="$PWD/dist/ios-release"
+          mkdir -p "$OUT_DIR"
+          bash scripts/build-ios-unsigned-ipa.sh "$OUT_DIR/ChatBot-${TAG}-ios-unsigned.ipa"
+          ls -lah "$OUT_DIR"
+
+      - name: Upload iOS workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned-ipa
+          path: dist/ios-release/*.ipa
+          if-no-files-found: error
+
+      - name: Upload iOS assets to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${{ needs.create-release.outputs.tag }}"
+          for file in dist/ios-release/*.ipa; do
+            gh release upload "$TAG" "$file" --clobber
+          done

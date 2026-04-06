@@ -1,0 +1,47 @@
+{
+  "identifier": "default",
+  "description": "ChatBot default permissions",
+  "windows": ["main"],
+  "webviews": ["main"],
+  "permissions": [
+    "core:default",
+    "sql:default",
+    "sql:allow-load",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-close",
+    "fs:default",
+    "notification:default",
+    "opener:default",
+    "dialog:default",
+    "fs:allow-write-text-file",
+    "http:default",
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [
+        { "url": "http://*" },
+        { "url": "https://*" },
+        { "url": "http://*:*" },
+        { "url": "https://*:*" }
+      ]
+    },
+    {
+      "identifier": "http:allow-fetch-send",
+      "allow": [
+        { "url": "http://*" },
+        { "url": "https://*" },
+        { "url": "http://*:*" },
+        { "url": "https://*:*" }
+      ]
+    },
+    {
+      "identifier": "http:allow-fetch-read-body",
+      "allow": [
+        { "url": "http://*" },
+        { "url": "https://*" },
+        { "url": "http://*:*" },
+        { "url": "https://*:*" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+/src/main/java/com/gyc_12/ChatBot/generated
+/src/main/jniLibs/**/*.so
+/src/main/assets/tauri.conf.json
+/tauri.build.gradle.kts
+/proguard-tauri.pro
+/tauri.properties

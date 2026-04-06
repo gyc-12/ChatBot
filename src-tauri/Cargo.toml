@@ -1,0 +1,36 @@
+[package]
+name = "ChatBot"
+version = "1.0.0"
+description = "ChatBot - AI Chat Client"
+authors = ["gyc-12"]
+license = "MIT"
+repository = "https://github.com/gyc-12/ChatBot"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "ChatBot_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.4", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.10.0", features = [] }
+tauri-plugin-log = "2"
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+tauri-plugin-fs = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-http = { version = "2", features = ["rustls-tls"] }
+tauri-plugin-dialog = "2.6.0"
+uuid = { version = "1", features = ["v4"] }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+tokio = { version = "1", features = ["process", "io-util", "sync", "time"] }

@@ -1,0 +1,452 @@
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
+import {
+  IoRefreshOutline,
+  IoSearchOutline,
+  IoCloseCircle,
+  IoTrashOutline,
+  IoEyeOutline,
+  IoConstructOutline,
+  IoBulbOutline,
+  IoPulseOutline,
+  IoCheckmarkCircle,
+} from "../../icons";
+import { useProviderStore } from "../../stores/provider-store";
+import { sortEnabledFirst, isSameOrder } from "../../lib/model-utils";
+import { getModelIcon, getModelCategory } from "../../lib/model-icons";
+import type { Model } from "../../types";
+
+interface ProviderModelListProps {
+  providerId: string;
+  pulling: boolean;
+  onRefresh: () => void;
+}
+
+export function ProviderModelList({ providerId, pulling, onRefresh }: ProviderModelListProps) {
+  const { t } = useTranslation();
+
+  const models = useProviderStore((s) => s.models);
+  const displayModels = useMemo(
+    () => models.filter((m) => m.providerId === providerId),
+    [models, providerId],
+  );
+  const toggleModel = useProviderStore((s) => s.toggleModel);
+  const setProviderModelsEnabled = useProviderStore((s) => s.setProviderModelsEnabled);
+  const addModelById = useProviderStore((s) => s.addModelById);
+  const deleteModel = useProviderStore((s) => s.deleteModel);
+  const probeModelCapabilities = useProviderStore((s) => s.probeModelCapabilities);
+  const checkModelHealthAction = useProviderStore((s) => s.checkModelHealth);
+
+  const [modelSearch, setModelSearch] = useState("");
+  const [newModelId, setNewModelId] = useState("");
+  const [probingModelIds, setProbingModelIds] = useState<Set<string>>(new Set());
+  const [healthChecking, setHealthChecking] = useState(false);
+  const [healthCheckingIds, setHealthCheckingIds] = useState<Set<string>>(new Set());
+  const [healthResults, setHealthResults] = useState<Map<string, { ok: boolean; error?: string }>>(
+    new Map(),
+  );
+  const [modelOrder, setModelOrder] = useState<{ providerId: string; ids: string[] }>(() => {
+    const initial = useProviderStore.getState().models.filter((m) => m.providerId === providerId);
+    return { providerId, ids: sortEnabledFirst(initial).map((m) => m.id) };
+  });
+
+  useEffect(() => {
+    if (displayModels.length === 0) return;
+    setModelOrder((current) => {
+      // providerId 切换：重新初始化顺序
+      if (current.providerId !== providerId) {
+        return { providerId, ids: sortEnabledFirst(displayModels).map((m) => m.id) };
+      }
+      // 增量更新：保留已有顺序，追加新模型，移除已删除模型
+      const modelIds = new Set(displayModels.map((m) => m.id));
+      const nextIds = current.ids.filter((id) => modelIds.has(id));
+      const orderedIds = new Set(nextIds);
+      for (const m of displayModels) {
+        if (!orderedIds.has(m.id)) nextIds.push(m.id);
+      }
+      return isSameOrder(current.ids, nextIds) ? current : { providerId, ids: nextIds };
+    });
+  }, [displayModels, providerId]);
+
+  const orderedModels = useMemo(() => {
+    const modelsById = new Map(displayModels.map((model) => [model.id, model]));
+    const ordered: Model[] = [];
+
+    for (const id of modelOrder.ids) {
+      const model = modelsById.get(id);
+      if (!model) continue;
+      ordered.push(model);
+      modelsById.delete(id);
+    }
+
+    ordered.push(...modelsById.values());
+    return ordered;
+  }, [displayModels, modelOrder]);
+
+  const filteredModels = useMemo(() => {
+    if (!modelSearch) return orderedModels;
+    const query = modelSearch.toLowerCase();
+    return orderedModels.filter(
+      (m) => m.displayName.toLowerCase().includes(query) || m.modelId.toLowerCase().includes(query),
+    );
+  }, [orderedModels, modelSearch]);
+
+  const groupedModels = useMemo(() => {
+    const groups = new Map<string, Model[]>();
+    for (const m of filteredModels) {
+      const cat = getModelCategory(m.displayName || m.modelId);
+      if (!groups.has(cat)) groups.set(cat, []);
+      groups.get(cat)!.push(m);
+    }
+    // Sort groups: "Other" last, rest alphabetically
+    return Array.from(groups.entries()).sort(([a], [b]) => {
+      if (a === "Other") return 1;
+      if (b === "Other") return -1;
+      return a.localeCompare(b);
+    });
+  }, [filteredModels]);
+
+  const allEnabled = useMemo(() => displayModels.every((m) => m.enabled), [displayModels]);
+  const enabledModels = useMemo(() => displayModels.filter((m) => m.enabled), [displayModels]);
+  const trimmedModelId = newModelId.trim();
+
+  const handleBatchHealthCheck = useCallback(async () => {
+    if (healthChecking || enabledModels.length === 0) return;
+    setHealthChecking(true);
+    setHealthResults(new Map());
+    const checkingIds = new Set(enabledModels.map((m) => m.id));
+    setHealthCheckingIds(checkingIds);
+
+    let passed = 0;
+    let failed = 0;
+    const failedIds: string[] = [];
+    await Promise.all(
+      enabledModels.map(async (m) => {
+        const result = await checkModelHealthAction(m.id);
+        if (result.ok) passed++;
+        else {
+          failed++;
+          failedIds.push(m.id);
+        }
+        setHealthResults((prev) => new Map(prev).set(m.id, result));
+        setHealthCheckingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(m.id);
+          return next;
+        });
+      }),
+    );
+
+    // Auto-disable failed models
+    for (const id of failedIds) {
+      toggleModel(id);
+    }
+
+    if (failed === 0) {
+      toast.success(t("providerEdit.healthAllPassed", { count: passed }));
+    } else {
+      toast.warning(t("providerEdit.healthResult", { passed, failed }));
+    }
+    setHealthChecking(false);
+  }, [healthChecking, enabledModels, checkModelHealthAction, toggleModel, t]);
+
+  const handleSingleHealthCheck = useCallback(
+    async (modelId: string) => {
+      setHealthCheckingIds((prev) => new Set(prev).add(modelId));
+      setHealthResults((prev) => {
+        const next = new Map(prev);
+        next.delete(modelId);
+        return next;
+      });
+      try {
+        const result = await checkModelHealthAction(modelId);
+        setHealthResults((prev) => new Map(prev).set(modelId, result));
+        if (result.ok) {
+          toast.success(t("providerEdit.healthCheck") + " ✓");
+        } else {
+          toast.error(result.error ?? "Check failed");
+        }
+      } catch (err: any) {
+        toast.error(err?.message || "Check failed");
+      } finally {
+        setHealthCheckingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(modelId);
+          return next;
+        });
+      }
+    },
+    [checkModelHealthAction, t],
+  );
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-center justify-between px-1">
+        <span className="text-muted-foreground text-[13px] font-normal tracking-tight uppercase">
+          {t("providerEdit.models")} ({filteredModels.length})
+        </span>
+        <div className="flex items-center gap-3">
+          {displayModels.length > 0 && (
+            <button
+              onClick={() => setProviderModelsEnabled(providerId, !allEnabled)}
+              className="text-[13px] font-medium active:opacity-60"
+              style={{ color: "var(--primary)" }}
+            >
+              {allEnabled ? t("providerEdit.deselectAll") : t("providerEdit.selectAll")}
+            </button>
+          )}
+          {enabledModels.length > 0 && (
+            <button
+              onClick={handleBatchHealthCheck}
+              disabled={healthChecking}
+              className="flex items-center gap-1 text-[13px] font-medium active:opacity-60 disabled:opacity-40"
+              style={{ color: "var(--primary)" }}
+            >
+              {healthChecking ? (
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+              ) : (
+                <IoPulseOutline size={14} color="var(--primary)" />
+              )}
+              {t("providerEdit.healthCheck")}
+            </button>
+          )}
+          <button
+            onClick={onRefresh}
+            disabled={pulling}
+            className="flex items-center gap-1 text-[13px] font-medium active:opacity-60"
+            style={{ color: "var(--primary)" }}
+          >
+            <IoRefreshOutline size={14} color="var(--primary)" />
+            {t("providerEdit.refresh")}
+          </button>
+        </div>
+      </div>
+
+      <div
+        className="mt-3 flex items-center rounded-lg px-3 py-2.5 ring-1 ring-[color:color-mix(in_srgb,var(--border)_40%,transparent)]"
+        style={{ backgroundColor: "var(--card)" }}
+      >
+        <IoSearchOutline size={16} color="var(--muted-foreground)" className="mr-2" />
+        <input
+          className="text-foreground flex-1 bg-transparent text-[14px] outline-none"
+          value={modelSearch}
+          onChange={(e) => setModelSearch(e.target.value)}
+          placeholder={t("providerEdit.searchModels")}
+        />
+        {modelSearch && (
+          <button onClick={() => setModelSearch("")} className="active:opacity-60">
+            <IoCloseCircle size={16} color="var(--muted-foreground)" />
+          </button>
+        )}
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <input
+          className="text-foreground flex-1 rounded-lg px-3 py-2.5 text-[14px] outline-none ring-1 ring-[color:color-mix(in_srgb,var(--border)_40%,transparent)]"
+          style={{ backgroundColor: "var(--card)" }}
+          value={newModelId}
+          onChange={(e) => setNewModelId(e.target.value)}
+          placeholder={t("providerEdit.addModelPlaceholder")}
+        />
+        <button
+          onClick={() => {
+            if (!trimmedModelId) return;
+            addModelById(providerId, trimmedModelId);
+            setNewModelId("");
+          }}
+          disabled={!trimmedModelId}
+          className="rounded-lg px-4 py-2.5 text-[14px] font-medium transition-opacity duration-200 active:opacity-80"
+          style={{
+            backgroundColor: trimmedModelId ? "var(--primary)" : "var(--muted)",
+            color: trimmedModelId ? "white" : "var(--muted-foreground)",
+          }}
+        >
+          {t("common.add")}
+        </button>
+      </div>
+
+      <div className="mt-3 flex flex-col gap-4">
+        {groupedModels.map(([category, categoryModels]) => (
+          <div key={category}>
+            {/* Category header */}
+            <div className="mb-2 flex items-center gap-2 border-b border-[color:color-mix(in_srgb,var(--border)_30%,transparent)] px-1 pb-2">
+              <span
+                className="flex h-5 w-5 items-center justify-center text-[var(--muted-foreground)]"
+                style={{ fontSize: 14 }}
+              >
+                {getModelIcon(category === "Other" ? "" : categoryModels[0]?.displayName || category)}
+              </span>
+              <span className="text-[13px] font-semibold text-[var(--foreground)]">
+                {category}
+              </span>
+              <span className="text-[12px] text-[var(--muted-foreground)]">
+                ({categoryModels.length})
+              </span>
+            </div>
+
+            {/* Models in category */}
+            <div className="flex flex-col gap-2">
+              <AnimatePresence initial={false}>
+                {categoryModels.map((m) => (
+                  <motion.div
+                    key={m.id}
+                    layout
+                    transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                    className="rounded-lg px-3.5 py-3 ring-1 ring-[color:color-mix(in_srgb,var(--border)_35%,transparent)]"
+                    style={{ backgroundColor: "var(--card)" }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="mr-3 flex min-w-0 flex-1 items-center gap-3">
+                        <div
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-[var(--muted-foreground)]"
+                          style={{ backgroundColor: "var(--secondary)", fontSize: 15 }}
+                        >
+                          {getModelIcon(m.displayName || m.modelId)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <p
+                              className={`truncate text-[15px] font-semibold ${m.enabled ? "text-foreground" : "text-muted-foreground/40"}`}
+                            >
+                              {m.displayName}
+                            </p>
+                            {healthCheckingIds.has(m.id) && (
+                              <span
+                                className="inline-block h-3.5 w-3.5 flex-shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
+                                style={{ color: "var(--primary)" }}
+                              />
+                            )}
+                            {!healthCheckingIds.has(m.id) &&
+                              healthResults.has(m.id) &&
+                              (healthResults.get(m.id)!.ok ? (
+                                <IoCheckmarkCircle
+                                  size={15}
+                                  color="var(--success)"
+                                  className="flex-shrink-0"
+                                />
+                              ) : (
+                                <IoCloseCircle
+                                  size={15}
+                                  color="var(--destructive)"
+                                  className="flex-shrink-0"
+                                />
+                              ))}
+                          </div>
+                          <p className="text-muted-foreground truncate text-[12px]">{m.modelId}</p>
+                          {healthResults.has(m.id) &&
+                            !healthResults.get(m.id)!.ok &&
+                            healthResults.get(m.id)!.error && (
+                              <p className="text-destructive mt-0.5 truncate text-[11px]">
+                                {healthResults.get(m.id)!.error}
+                              </p>
+                            )}
+                        </div>
+                      </div>
+                      <div className="flex flex-shrink-0 items-center gap-2">
+                        <button
+                          onClick={() => handleSingleHealthCheck(m.id)}
+                          disabled={healthCheckingIds.has(m.id)}
+                          className="p-1 active:opacity-60 disabled:opacity-40"
+                          title={t("providerEdit.healthCheck")}
+                        >
+                          {healthCheckingIds.has(m.id) ? (
+                            <span
+                              className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                              style={{ color: "var(--primary)" }}
+                            />
+                          ) : (
+                            <IoPulseOutline size={16} color="var(--primary)" />
+                          )}
+                        </button>
+                        <label className="relative inline-flex cursor-pointer items-center">
+                          <input
+                            type="checkbox"
+                            checked={m.enabled}
+                            onChange={() => toggleModel(m.id)}
+                            className="peer sr-only"
+                          />
+                          <div className="peer-checked:bg-primary bg-muted-foreground/30 h-6 w-11 rounded-full after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full" />
+                        </label>
+                        <button
+                          onClick={() => deleteModel(m.id)}
+                          className="p-1 active:opacity-60"
+                          title={t("common.delete")}
+                        >
+                          <IoTrashOutline size={16} color="var(--destructive)" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-11">
+                      {[
+                        {
+                          key: "vision",
+                          label: t("providerEdit.vision"),
+                          on: m.capabilities?.vision,
+                          icon: <IoEyeOutline size={12} />,
+                        },
+                        {
+                          key: "tools",
+                          label: t("providerEdit.tools"),
+                          on: m.capabilities?.toolCall,
+                          icon: <IoConstructOutline size={12} />,
+                        },
+                        {
+                          key: "reasoning",
+                          label: t("providerEdit.reasoning"),
+                          on: m.capabilities?.reasoning,
+                          icon: <IoBulbOutline size={12} />,
+                        },
+                      ].map((cap) => (
+                        <span
+                          key={cap.key}
+                          className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] ${!cap.on ? "opacity-25" : ""}`}
+                          style={{
+                            backgroundColor: "var(--muted)",
+                            color: cap.on ? "var(--foreground)" : "var(--muted-foreground)",
+                          }}
+                        >
+                          <span style={{ color: cap.on ? "var(--primary)" : "inherit" }}>
+                            {cap.icon}
+                          </span>
+                          {cap.label}
+                        </span>
+                      ))}
+                      <button
+                        onClick={async () => {
+                          setProbingModelIds((prev) => new Set(prev).add(m.id));
+                          try {
+                            await probeModelCapabilities(m.id);
+                          } catch {
+                            /* ignore */
+                          } finally {
+                            setProbingModelIds((prev) => {
+                              const next = new Set(prev);
+                              next.delete(m.id);
+                              return next;
+                            });
+                          }
+                        }}
+                        disabled={probingModelIds.has(m.id)}
+                        className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium transition-opacity duration-200 active:opacity-60 disabled:opacity-40"
+                        style={{ backgroundColor: "var(--muted)", color: "var(--primary)" }}
+                      >
+                        {probingModelIds.has(m.id) ? (
+                          <span className="inline-block h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+                        ) : (
+                          <IoPulseOutline size={12} />
+                        )}
+                        {t("providerEdit.probe")}
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
