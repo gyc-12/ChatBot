@@ -20,14 +20,24 @@
 
 ChatBot 是一个面向桌面端和移动端的多平台 AI 对话应用。
 
-这一版项目已经从早期的复杂实验形态收敛到更清晰的产品结构：
+产品结构：
 
 - 聊天页负责对话、历史记录、模型切换、富文本渲染与工具调用
 - 设置页负责 Provider、模型、MCP 服务器、数据管理等核心配置
 - 桌面端使用左右分栏布局
 - 移动端使用更贴近原生应用的两层导航结构
 
-当前 UI 以聊天和设置为核心。角色、语音等能力暂不作为主界面重点展示。
+
+
+## 界面预览
+### 桌面端
+
+![ChatBot Desktop Preview](public/desktop.png)
+
+### 移动端
+
+![ChatBot Mobile Preview](public/app.png)
+
 
 ## 当前核心能力
 
@@ -69,20 +79,7 @@ ChatBot 是一个面向桌面端和移动端的多平台 AI 对话应用。
 - 导出会话内容
 - 本地 SQLite 存储，不依赖自建云端服务
 
-## 界面结构
 
-### 桌面端
-
-- 左侧为历史会话与快捷入口
-- 右侧为聊天区或设置区
-- 设置页为左侧导航 + 右侧详情的工作台结构
-
-### 移动端
-
-- 底部保留聊天与设置两个主入口
-- 设置首页展示所有配置项
-- 点击设置项后进入二级详情页
-- MCP 页面与表单页按移动端交互重新组织
 
 ## 技术栈
 
@@ -90,13 +87,9 @@ ChatBot 是一个面向桌面端和移动端的多平台 AI 对话应用。
 |------|------|
 | 跨端框架 | Tauri 2 (Rust) |
 | 前端框架 | React 19 · Vite |
-| 路由 | react-router-dom |
 | 状态管理 | Zustand |
 | 数据库 | tauri-plugin-sql (SQLite) |
-| 样式 | TailwindCSS v4 · shadcn/ui · Radix UI |
-| 协议 | OpenAI Compatible API · Anthropic Messages · MCP |
-| 渲染 | react-markdown · Mermaid · KaTeX · Shiki |
-| 动画 | Framer Motion |
+| 样式 | TailwindCSS v4  · Radix UI |
 
 ## 本地开发
 
@@ -189,7 +182,7 @@ ChatBot/
 │   ├── icons/                 # 应用图标
 │   └── tauri.conf.json        # Tauri 配置
 ├── public/                    # 静态资源
-└── stitch_modern_ai_chat_ui/  # 本项目参考的 Stitch UI 设计稿
+
 ```
 
 ## 数据与隐私
@@ -199,13 +192,7 @@ ChatBot/
 - 你填写的 API Key 会用于请求你选择的 AI Provider
 - 是否发送到第三方模型服务，取决于你的 Provider 配置
 
-## 适合这个项目的场景
 
-- 搭建一个本地优先的 AI 对话客户端
-- 统一管理不同 Provider 与模型
-- 在对话中接入 MCP 工具
-- 同时维护桌面端和移动端的统一体验
-- 作为 Tauri 2 + React 19 AI 应用的工程模板继续演进
 
 ## 许可证
 
