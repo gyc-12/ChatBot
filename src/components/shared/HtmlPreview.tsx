@@ -99,9 +99,13 @@ export const HtmlPreview = memo(function HtmlPreview({
     let cancelled = false;
     const isDark = document.documentElement.classList.contains("dark");
 
-    highlightCode(displayCode, language, isDark ? "github-dark" : "github-light").then((result) => {
-      if (!cancelled) setHighlightedHtml(result);
-    });
+    highlightCode(displayCode, language, isDark ? "github-dark" : "github-light")
+      .then((result) => {
+        if (!cancelled) setHighlightedHtml(result);
+      })
+      .catch(() => {
+        if (!cancelled) setHighlightedHtml(null);
+      });
 
     return () => {
       cancelled = true;

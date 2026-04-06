@@ -174,9 +174,13 @@ function HighlightedCodeBlock({
   useEffect(() => {
     let cancelled = false;
     const isDark = document.documentElement.classList.contains("dark");
-    highlightCode(code, lang, isDark ? "github-dark" : "github-light").then((result) => {
-      if (!cancelled) setHtml(result);
-    });
+    highlightCode(code, lang, isDark ? "github-dark" : "github-light")
+      .then((result) => {
+        if (!cancelled) setHtml(result);
+      })
+      .catch(() => {
+        if (!cancelled) setHtml(null);
+      });
     return () => {
       cancelled = true;
     };
@@ -218,7 +222,7 @@ function HighlightedCodeBlock({
         ) : (
           <pre
             className="m-0 px-3 py-2 font-mono text-[13px] leading-relaxed"
-            style={{ color: "var(--foreground)" }}
+            style={{ backgroundColor: "var(--background)", color: "var(--foreground)" }}
           >
             <code>{code}</code>
           </pre>

@@ -1,4 +1,8 @@
-import { createHighlighter, type Highlighter } from "shiki";
+import {
+  createHighlighter,
+  createJavaScriptRegexEngine,
+  type Highlighter,
+} from "shiki";
 
 let highlighterPromise: Promise<Highlighter> | null = null;
 
@@ -30,6 +34,9 @@ const PRELOADED_LANGS = [
 export function getHighlighter(): Promise<Highlighter> {
   if (!highlighterPromise) {
     highlighterPromise = createHighlighter({
+      // iOS/Android release builds are more sensitive to WASM bootstrap timing/path issues.
+      // Using the JS regex engine keeps syntax highlighting deterministic across dev and packaged apps.
+      engine: createJavaScriptRegexEngine(),
       themes: ["github-dark", "github-light"],
       langs: PRELOADED_LANGS,
     });
