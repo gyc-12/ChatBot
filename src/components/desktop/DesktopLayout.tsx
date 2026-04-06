@@ -9,7 +9,7 @@ import { useProviderStore } from "../../stores/provider-store";
 import { useChatStore, type ChatState } from "../../stores/chat-store";
 import type { Conversation } from "../../types";
 
-const DESKTOP_SIDEBAR_COLLAPSED_KEY = "talkio:desktop_sidebar_collapsed_v1";
+const DESKTOP_SIDEBAR_COLLAPSED_KEY = "desktop_sidebar_collapsed_v1";
 type DesktopView = "chat" | "settings";
 
 function loadInitialSidebarCollapsed() {

@@ -6,13 +6,14 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IOS_GEN_DIR="$ROOT_DIR/src-tauri/gen/apple"
 DERIVED_DATA_PATH="$IOS_GEN_DIR/build/unsigned-iphoneos"
 APP_PATH="$DERIVED_DATA_PATH/Build/Products/release-iphoneos/ChatBot.app"
-LIB_SOURCE="$ROOT_DIR/src-tauri/target/aarch64-apple-ios/release/libChatBot_lib.a"
 LIB_TARGET_DIR="$IOS_GEN_DIR/Externals/arm64/release"
 DEFAULT_OUTPUT="$ROOT_DIR/src-tauri/target/release/bundle/ios/ChatBot-unsigned.ipa"
 OUTPUT_PATH="${1:-$DEFAULT_OUTPUT}"
 REAL_NPM_BIN="$(command -v npm)"
 FAKEBIN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/chatbot-ios-fakebin.XXXXXX")"
 CACHE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/chatbot-ios-cache.XXXXXX")"
+CARGO_TARGET_DIR="$CACHE_DIR/cargo-target"
+LIB_SOURCE="$CARGO_TARGET_DIR/aarch64-apple-ios/release/libChatBot_lib.a"
 
 cleanup() {
   rm -rf "$FAKEBIN_DIR" "$CACHE_DIR"
@@ -24,13 +25,15 @@ if [ ! -d "$IOS_GEN_DIR/ChatBot.xcodeproj" ]; then
   (cd "$ROOT_DIR" && npx tauri ios init --ci)
 fi
 
-mkdir -p "$CACHE_DIR/clang" "$CACHE_DIR/swiftpm"
+mkdir -p "$IOS_GEN_DIR/assets"
+mkdir -p "$CACHE_DIR/clang" "$CACHE_DIR/swiftpm" "$CARGO_TARGET_DIR"
 
 (
   cd "$ROOT_DIR"
   npm run build
   CLANG_MODULE_CACHE_PATH="$CACHE_DIR/clang" \
   SWIFTPM_MODULECACHE_OVERRIDE="$CACHE_DIR/swiftpm" \
+  CARGO_TARGET_DIR="$CARGO_TARGET_DIR" \
   cargo build \
     --manifest-path src-tauri/Cargo.toml \
     --target aarch64-apple-ios \
