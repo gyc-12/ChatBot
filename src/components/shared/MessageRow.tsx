@@ -24,6 +24,8 @@ import {
   FolderOpen,
   Save,
   Loader2,
+  Square,
+  Volume2,
 } from "lucide-react";
 import { MessageContent } from "./MessageContent";
 import type { Message } from "../../types";
@@ -31,6 +33,10 @@ import { MessageStatus } from "../../types";
 import type { WrittenFile, WorkspaceFileStatus } from "../../services/file-writer";
 import { getAvatarProps } from "../../lib/avatar-utils";
 import { useProviderStore } from "../../stores/provider-store";
+import { appAlert } from "./ConfirmDialogProvider";
+import { useSettingsStore } from "../../stores/settings-store";
+import { isTtsConfigured } from "../../services/voice-api";
+import { toggleSpeechPlayback, useVoicePlayback } from "../../services/voice-playback";
 
 // ── Ionicons-style action button (1:1 RN ActionButton) ──
 
@@ -55,6 +61,69 @@ function ActionBtn({
   return (
     <button onClick={onClick} className="rounded-md p-1.5 active:opacity-60" title={icon}>
       <IconComp size={15} color={color ?? "var(--muted-foreground)"} />
+    </button>
+  );
+}
+
+function SpeechActionButton({
+  messageId,
+  content,
+  t,
+}: {
+  messageId: string;
+  content: string;
+  t: (key: string) => string;
+}) {
+  const settings = useSettingsStore((state) => state.settings);
+  const { isLoading, isPlaying } = useVoicePlayback(messageId);
+
+  if (!content.trim()) return null;
+
+  const handleClick = useCallback(async () => {
+    const config = {
+      baseUrl: settings.ttsBaseUrl,
+      apiKey: settings.ttsApiKey,
+      model: settings.ttsModel,
+      voice: settings.ttsVoice,
+      responseFormat: settings.ttsResponseFormat,
+    };
+
+    if (!isTtsConfigured(config)) {
+      await appAlert(t("chat.noTtsProvider"));
+      return;
+    }
+
+    try {
+      await toggleSpeechPlayback({
+        messageId,
+        text: content,
+        config,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await appAlert(`${t("chat.audioPlaybackFailed")}: ${message}`);
+    }
+  }, [content, messageId, settings, t]);
+
+  const label = isLoading || isPlaying ? t("chat.stopAudio") : t("chat.playAudio");
+
+  return (
+    <button
+      type="button"
+      onClick={() => void handleClick()}
+      className={`rounded-md p-1.5 active:opacity-60 ${
+        isLoading || isPlaying ? "bg-[var(--secondary)] text-[var(--foreground)]" : ""
+      }`}
+      title={label}
+      aria-label={label}
+    >
+      {isLoading ? (
+        <Loader2 size={14} className="animate-spin" />
+      ) : isPlaying ? (
+        <Square size={14} color="var(--muted-foreground)" />
+      ) : (
+        <Volume2 size={14} color="var(--muted-foreground)" />
+      )}
     </button>
   );
 }
@@ -111,6 +180,7 @@ function AssistantActionBar({
 
   return (
     <div className="ml-1 flex items-center gap-0.5">
+      <SpeechActionButton messageId={message.id} content={content} t={t} />
       {onCopy && <ActionBtn icon="copy-outline" onClick={() => onCopy(content)} />}
       {onRegenerate && (
         <ActionBtn icon="refresh-outline" onClick={() => onRegenerate(message.id)} />
@@ -131,6 +201,7 @@ function AssistantActionBar({
       {/* ··· overflow menu */}
       <div className="relative">
         <button
+          type="button"
           onClick={() => setShowMenu((v) => !v)}
           className="rounded-md p-1.5 active:opacity-60"
         >
@@ -157,6 +228,7 @@ function AssistantActionBar({
             >
               {onBranch && (
                 <button
+                  type="button"
                   className="flex w-full items-center gap-3 px-3.5 py-2.5 active:opacity-60"
                   onClick={() => {
                     setShowMenu(false);
@@ -168,6 +240,7 @@ function AssistantActionBar({
                 </button>
               )}
               <button
+                type="button"
                 className="flex w-full items-center gap-3 px-3.5 py-2.5 active:opacity-60"
                 onClick={() => {
                   setShowMenu(false);
@@ -188,6 +261,7 @@ function AssistantActionBar({
                     }}
                   />
                   <button
+                    type="button"
                     className="flex w-full items-center gap-3 px-3.5 py-2.5 active:opacity-60"
                     onClick={() => {
                       setShowMenu(false);
@@ -232,8 +306,10 @@ function UserActionBar({
 
   return (
     <div className="mr-1 flex items-center gap-0.5">
+      <SpeechActionButton messageId={message.id} content={content} t={t} />
       {onEdit && (
         <button
+          type="button"
           onClick={startEditing}
           className="rounded-md p-1.5 active:opacity-60"
           title={t("common.edit")}
@@ -245,6 +321,7 @@ function UserActionBar({
       {onDelete && (
         <div className="relative">
           <button
+            type="button"
             onClick={() => setShowMenu((v) => !v)}
             className="rounded-md p-1.5 active:opacity-60"
           >
@@ -270,6 +347,7 @@ function UserActionBar({
                 style={{ backgroundColor: "var(--card)", border: "0.5px solid var(--border)" }}
               >
                 <button
+                  type="button"
                   className="flex w-full items-center gap-3 px-3.5 py-2.5 active:opacity-60"
                   onClick={() => {
                     setShowMenu(false);
@@ -439,7 +517,11 @@ export const MessageRow = memo(function MessageRow({
                 className="flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-[13px] font-medium text-white active:opacity-70"
                 style={{ backgroundColor: "var(--primary)" }}
               >
-                {isSavingEdit ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                {isSavingEdit ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Check size={14} />
+                )}
                 {t("common.save")}
               </button>
             </div>

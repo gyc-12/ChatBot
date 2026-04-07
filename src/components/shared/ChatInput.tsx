@@ -1,6 +1,10 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowUp, ChevronDown, Loader2, Paperclip, Sparkles, Square, X } from "lucide-react";
+import { ArrowUp, ChevronDown, Loader2, Mic, Paperclip, Sparkles, Square, X } from "lucide-react";
+import { appAlert } from "./ConfirmDialogProvider";
+import { startVoiceRecording, isVoiceRecordingSupported } from "../../services/voice-recorder";
+import { transcribeAudio } from "../../services/voice-client";
+import { isSttConfigured } from "../../services/voice-api";
 import { useSettingsStore } from "../../stores/settings-store";
 import { REASONING_EFFORT_LEVELS, type ReasoningEffort } from "../../types";
 import {
@@ -57,7 +61,8 @@ export const ChatInput = memo(function ChatInput({
   keyboardInset = 0,
 }: ChatInputProps) {
   const { t } = useTranslation();
-  const enterToSend = useSettingsStore((state) => state.settings.enterToSend);
+  const settings = useSettingsStore((state) => state.settings);
+  const enterToSend = settings.enterToSend;
   const basePlaceholder = placeholder ?? t("chat.message");
   const sendKey = enterToSend ? "Enter" : isMac ? "Cmd+Enter" : "Ctrl+Enter";
   const newLineKey = enterToSend ? "Shift+Enter" : "Enter";
@@ -75,6 +80,9 @@ export const ChatInput = memo(function ChatInput({
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<ParsedFile[]>([]);
   const [isParsingFiles, setIsParsingFiles] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const recordingSessionRef = useRef<Awaited<ReturnType<typeof startVoiceRecording>> | null>(null);
 
   const visualFiles = useMemo(
     () => [
@@ -108,6 +116,13 @@ export const ChatInput = memo(function ChatInput({
   useEffect(() => {
     resizeTextarea();
   }, [text, resizeTextarea]);
+
+  useEffect(() => {
+    return () => {
+      recordingSessionRef.current?.cancel();
+      recordingSessionRef.current = null;
+    };
+  }, []);
 
   const resetComposer = useCallback(() => {
     setText("");
@@ -186,6 +201,92 @@ export const ChatInput = memo(function ChatInput({
   const removeImageAtIndex = useCallback((index: number) => {
     setAttachedImages((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }, []);
+
+  const handleRecordingError = useCallback(
+    async (error: unknown) => {
+      const errorName = error instanceof DOMException ? error.name : "";
+      if (errorName === "NotAllowedError" || errorName === "PermissionDeniedError") {
+        await appAlert(t("chat.micPermissionDenied"));
+        return;
+      }
+
+      const message = error instanceof Error ? error.message : String(error);
+      await appAlert(`${t("chat.transcriptionFailed")}: ${message}`);
+    },
+    [t],
+  );
+
+  const stopRecordingAndTranscribe = useCallback(async () => {
+    const session = recordingSessionRef.current;
+    if (!session) return;
+
+    recordingSessionRef.current = null;
+    setIsRecording(false);
+    setIsTranscribing(true);
+
+    try {
+      const audioBlob = await session.stop();
+      const audioFile = new File([audioBlob], `chatbot-recording-${Date.now()}.webm`, {
+        type: audioBlob.type || "audio/webm",
+      });
+      const transcript = await transcribeAudio(
+        {
+          baseUrl: settings.sttBaseUrl,
+          apiKey: settings.sttApiKey,
+          model: settings.sttModel,
+        },
+        audioFile,
+      );
+
+      if (!transcript.trim()) {
+        await appAlert(t("chat.transcriptionEmpty"));
+        return;
+      }
+
+      setText((current) =>
+        settings.voiceAutoTranscribe && current.trim()
+          ? `${current.trimEnd()}\n${transcript}`
+          : transcript,
+      );
+    } catch (error) {
+      await handleRecordingError(error);
+    } finally {
+      setIsTranscribing(false);
+    }
+  }, [handleRecordingError, settings, t]);
+
+  const handleVoiceInput = useCallback(async () => {
+    if (isTranscribing) return;
+
+    if (isRecording) {
+      await stopRecordingAndTranscribe();
+      return;
+    }
+
+    if (
+      !isSttConfigured({
+        baseUrl: settings.sttBaseUrl,
+        apiKey: settings.sttApiKey,
+        model: settings.sttModel,
+      })
+    ) {
+      await appAlert(t("chat.noSttProvider"));
+      return;
+    }
+
+    if (!isVoiceRecordingSupported()) {
+      await appAlert(t("chat.voiceInputUnavailable"));
+      return;
+    }
+
+    try {
+      recordingSessionRef.current = await startVoiceRecording();
+      setIsRecording(true);
+    } catch (error) {
+      recordingSessionRef.current = null;
+      await handleRecordingError(error);
+    }
+  }, [handleRecordingError, isRecording, isTranscribing, settings, stopRecordingAndTranscribe, t]);
 
   return (
     <div
@@ -295,6 +396,8 @@ export const ChatInput = memo(function ChatInput({
 
           <button
             onClick={() => fileInputRef.current?.click()}
+            type="button"
+            aria-label={isParsingFiles ? t("common.loading") : t("chat.dropFiles")}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-[var(--muted-foreground)] transition-colors hover:bg-[var(--secondary)] hover:text-[var(--foreground)]"
           >
             {isParsingFiles ? (
@@ -314,9 +417,43 @@ export const ChatInput = memo(function ChatInput({
             className="min-h-[44px] flex-1 resize-none bg-transparent px-1 py-2 text-[15px] leading-6 text-[var(--foreground)] outline-none placeholder:text-[var(--muted-foreground)]"
           />
 
+          <button
+            type="button"
+            onClick={() => void handleVoiceInput()}
+            aria-label={
+              isTranscribing
+                ? t("chat.transcribing")
+                : isRecording
+                  ? t("chat.stopRecording")
+                  : t("chat.startRecording")
+            }
+            title={
+              isTranscribing
+                ? t("chat.transcribing")
+                : isRecording
+                  ? t("chat.stopRecording")
+                  : t("chat.startRecording")
+            }
+            disabled={isTranscribing}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition-all ${
+              isRecording
+                ? "bg-rose-500 text-white shadow-[0_12px_28px_rgba(244,63,94,0.28)]"
+                : "text-[var(--muted-foreground)] hover:bg-[var(--secondary)] hover:text-[var(--foreground)]"
+            } disabled:opacity-50`}
+          >
+            {isTranscribing ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : isRecording ? (
+              <Square size={16} />
+            ) : (
+              <Mic size={18} />
+            )}
+          </button>
+
           {isGenerating ? (
             <button
               onClick={onStop}
+              type="button"
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--foreground)] text-[var(--primary-foreground)] transition-opacity hover:opacity-90"
             >
               <Square size={18} />
@@ -324,6 +461,7 @@ export const ChatInput = memo(function ChatInput({
           ) : (
             <button
               onClick={handleSend}
+              type="button"
               disabled={!text.trim() && attachedImages.length === 0 && attachedFiles.length === 0}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--foreground)] text-[var(--primary-foreground)] transition-opacity hover:opacity-90 disabled:opacity-40"
             >

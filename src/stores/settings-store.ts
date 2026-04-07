@@ -1,5 +1,5 @@
 /**
- * Settings Store — manages app settings (theme, language, STT config).
+ * Settings Store — manages app settings (theme, language, voice config).
  * Migrated from RN src/stores/settings-store.ts, using localStorage instead of MMKV.
  */
 import { create } from "zustand";
@@ -13,6 +13,11 @@ export interface AppSettings {
   sttBaseUrl: string;
   sttApiKey: string;
   sttModel: string;
+  ttsBaseUrl: string;
+  ttsApiKey: string;
+  ttsModel: string;
+  ttsVoice: string;
+  ttsResponseFormat: "mp3" | "wav" | "opus" | "aac" | "flac" | "pcm";
   /** Enable automatic context compression when token count exceeds threshold */
   contextCompressionEnabled: boolean;
   /** Token threshold to trigger compression (default: 8000) */
@@ -35,6 +40,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   sttBaseUrl: "https://api.groq.com/openai/v1",
   sttApiKey: "",
   sttModel: "whisper-large-v3-turbo",
+  ttsBaseUrl: "",
+  ttsApiKey: "",
+  ttsModel: "gpt-4o-mini-tts",
+  ttsVoice: "alloy",
+  ttsResponseFormat: "mp3",
   contextCompressionEnabled: false,
   contextCompressionThreshold: 16000,
   enterToSend: true,
