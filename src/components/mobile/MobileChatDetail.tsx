@@ -31,7 +31,6 @@ export function MobileChatDetail({
     conv,
     messages,
     model,
-    currentParticipant,
     showModelPicker,
     setShowModelPicker,
     isExporting,
@@ -39,7 +38,7 @@ export function MobileChatDetail({
     handleModelPickerSelect,
     clearConversationMessages,
     duplicateConversation,
-    updateParticipantReasoningEffort,
+    updateConversationReasoningEffort,
   } = useChatPanelState(conversationId);
   const deleteConversation = useChatStore((state) => state.deleteConversation);
   const renameConversation = useChatStore((state) => state.renameConversation);
@@ -53,25 +52,21 @@ export function MobileChatDetail({
     [messages],
   );
   const { canConfigureReasoning, reasoningEffort } = useMemo(
-    () => getReasoningControlState(model, currentParticipant),
-    [currentParticipant, model],
+    () => getReasoningControlState(model, conv),
+    [conv, model],
   );
 
   const handleSelectReasoningEffort = useCallback(async (value: ReasoningEffort | undefined) => {
-    if (!currentParticipant || !canConfigureReasoning) return;
-    await updateParticipantReasoningEffort(
-      conversationId,
-      currentParticipant.id,
-      value,
-    );
+    if (!conv || !canConfigureReasoning) return;
+    await updateConversationReasoningEffort(conversationId, value);
   }, [
     canConfigureReasoning,
+    conv,
     conversationId,
-    currentParticipant,
-    updateParticipantReasoningEffort,
+    updateConversationReasoningEffort,
   ]);
 
-  if (!conv || !currentParticipant) {
+  if (!conv) {
     return null;
   }
 

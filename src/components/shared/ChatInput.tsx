@@ -23,7 +23,7 @@ import {
 const isMac = navigator.userAgent.toLowerCase().includes("mac");
 
 interface ChatInputProps {
-  onSend: (text: string, mentionedParticipantIds?: string[], images?: string[]) => void;
+  onSend: (text: string, images?: string[]) => void;
   isGenerating: boolean;
   onStop: () => void;
   placeholder?: string;
@@ -33,8 +33,6 @@ interface ChatInputProps {
   modelName?: string;
   onSwitchModel?: () => void;
   isMobile?: boolean;
-  isGroup?: boolean;
-  participants?: unknown[];
   hasMessages?: boolean;
   onStartAutoDiscuss?: (rounds: number, topicText?: string) => void;
   onStopAutoDiscuss?: () => void;
@@ -134,7 +132,7 @@ export const ChatInput = memo(function ChatInput({
     if (!finalText && imageList.length === 0) return;
     if (isGenerating) return;
 
-    onSend(finalText, undefined, imageList.length > 0 ? imageList : undefined);
+    onSend(finalText, imageList.length > 0 ? imageList : undefined);
     resetComposer();
   }, [attachedFiles, attachedImages, externalFiles, isGenerating, onSend, resetComposer, text]);
 

@@ -1,105 +1,28 @@
 /**
- * Chat message building utilities — extracted from chat-store.ts.
- * Simplified for focused single-participant chat flows.
+ * Chat message building utilities for single-chat conversations.
  */
-import type { Message, Conversation, ConversationParticipant } from "../types";
+import type { Message, Conversation } from "../types";
 import { MessageStatus } from "../types";
 import { useProviderStore } from "./provider-store";
 
-export function resolveTargetParticipants(
-  conv: Conversation,
-  _mentionedParticipantIds?: string[],
-): ConversationParticipant[] {
-  return conv.participants[0] ? [conv.participants[0]] : [];
+export function getConversationModelLabel(conversation: Conversation): string {
+  const model = useProviderStore.getState().getModelById(conversation.modelId);
+  return model?.displayName ?? conversation.modelId;
 }
 
-export interface ParticipantLabelParts {
-  modelName: string;
-  providerName: string | null;
-  suffix: string | null;
-}
-
-export function getParticipantLabelParts(
-  participant: ConversationParticipant,
-  allParticipants: ConversationParticipant[],
-): ParticipantLabelParts {
-  const providerStore = useProviderStore.getState();
-  const model = providerStore.getModelById(participant.modelId);
-  const modelName = model?.displayName ?? participant.modelId;
-  const providerName = model
-    ? (providerStore.getProviderById(model.providerId)?.name ?? null)
-    : null;
-
-  let suffix: string | null = null;
-  const sameModelParticipants = allParticipants.filter(
-    (item) => item.modelId === participant.modelId,
-  );
-  if (sameModelParticipants.length > 1) {
-    const index = sameModelParticipants.findIndex((item) => item.id === participant.id);
-    suffix = `#${index + 1}`;
-  }
-
-  return { modelName, providerName, suffix };
-}
-
-export function getParticipantLabel(
-  participant: ConversationParticipant,
-  allParticipants: ConversationParticipant[],
-): string {
-  const providerStore = useProviderStore.getState();
-  const model = providerStore.getModelById(participant.modelId);
-  const modelName = model?.displayName ?? participant.modelId;
-
-  const sameModelParticipants = allParticipants.filter(
-    (item) => item.modelId === participant.modelId,
-  );
-  if (sameModelParticipants.length > 1) {
-    const index = sameModelParticipants.findIndex((item) => item.id === participant.id);
-    return `${modelName} #${index + 1}`;
-  }
-
-  const sameNameParticipants = allParticipants.filter((item) => {
-    if (item.modelId === participant.modelId) return false;
-    const candidate = providerStore.getModelById(item.modelId);
-    return (candidate?.displayName ?? item.modelId) === modelName;
-  });
-
-  if (sameNameParticipants.length > 0 && model) {
-    const provider = providerStore.getProviderById(model.providerId);
-    if (provider?.name) {
-      return `${modelName} [${provider.name}]`;
-    }
-  }
-
-  return modelName;
-}
-
-export function buildGroupRoster(): string {
-  return "";
-}
-
-export function extractMentionedParticipants(
-  _content: string,
-  _conv: Conversation,
-  _selfParticipantId: string,
-): string[] {
-  return [];
-}
-
-export function buildApiMessagesForParticipant(
+export function buildApiMessagesForConversation(
   allMessages: Message[],
-  participant: ConversationParticipant,
-  conv: Conversation,
+  conversation: Conversation,
   options?: {
     workspaceTree?: string;
     workspaceFiles?: Array<{ path: string; content: string }>;
   },
 ): Array<{ role: string; content: unknown; tool_calls?: unknown; tool_call_id?: string }> {
-  const model = useProviderStore.getState().getModelById(participant.modelId);
+  const model = useProviderStore.getState().getModelById(conversation.modelId);
   const supportsVision = !!model?.capabilities?.vision;
   const apiMessages: Array<{ role: string; content: unknown }> = [];
 
-  const workspaceDir = conv.workspaceDir;
+  const workspaceDir = conversation.workspaceDir;
   let workspaceHint = "";
   if (workspaceDir) {
     workspaceHint = "The user attached a local workspace to this conversation.";
@@ -171,8 +94,6 @@ export function createUserMessage(
     role: "user",
     senderModelId: null,
     senderName: "You",
-    identityId: null,
-    participantId: null,
     content: text,
     images,
     generatedImages: [],
@@ -195,8 +116,6 @@ export function createAssistantMessage(
   conversationId: string,
   modelId: string,
   senderName: string,
-  participantId: string,
-  identityId: string | null,
   branchId: string | null,
   createdAt: string,
 ): Message {
@@ -206,8 +125,6 @@ export function createAssistantMessage(
     role: "assistant",
     senderModelId: modelId,
     senderName,
-    identityId,
-    participantId,
     content: "",
     images: [],
     generatedImages: [],

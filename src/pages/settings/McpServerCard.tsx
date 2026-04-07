@@ -154,7 +154,7 @@ export function McpServerCard({
               {endpointText}
             </p>
             <p className="mt-2 text-[12px] font-medium text-[var(--muted-foreground)]">
-              {serverTools.length} {t("personas.mcpTools").toLowerCase()}
+              {serverTools.length} {t("mcp.toolsLabel").toLowerCase()}
             </p>
           </div>
         </div>
@@ -239,7 +239,7 @@ export function McpServerCard({
               </span>
             </div>
             <p className="mt-2 text-xs text-[var(--muted-foreground)]">
-              {serverTools.length} {t("personas.mcpTools").toLowerCase()}
+              {serverTools.length} {t("mcp.toolsLabel").toLowerCase()}
             </p>
           </div>
         </div>

@@ -31,7 +31,7 @@ export function getMcpToolDefs() {
   }));
 }
 
-export function getMcpToolDefsForIdentity() {
+export function getEnabledMcpToolDefs() {
   const store = useMcpStore.getState();
   const tools = store.getAllEnabledTools();
 

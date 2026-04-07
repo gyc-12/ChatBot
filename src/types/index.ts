@@ -1,7 +1,6 @@
 export type ProviderType = "openai" | "anthropic" | "gemini" | "azure-openai";
 export type ApiFormat = "chat-completions" | "responses" | "anthropic-messages";
 export type ProviderStatus = "connected" | "disconnected" | "error" | "pending";
-export type ConversationType = "single" | "group";
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 export type McpToolType = "local" | "remote";
 export type McpToolScope = "global" | "identity-bound" | "ad-hoc";
@@ -63,21 +62,6 @@ export interface Model {
   enabled: boolean;
 }
 
-export interface IdentityParams {
-  temperature: number;
-}
-
-export interface Identity {
-  id: string;
-  name: string;
-  icon: string;
-  systemPrompt: string;
-  params: IdentityParams;
-  mcpToolIds: string[];
-  mcpServerIds: string[];
-  createdAt: string;
-}
-
 // Persisted MCP server configuration
 export interface McpServer {
   id: string;
@@ -131,22 +115,11 @@ export interface DiscoveredTool {
   inputSchema: Record<string, unknown>;
 }
 
-export interface ConversationParticipant {
-  id: string;
-  modelId: string;
-  identityId: string | null;
-  reasoningEffort?: ReasoningEffort;
-}
-
-export type SpeakingOrder = "sequential" | "random" | "parallel";
-
 export interface Conversation {
   id: string;
-  type: ConversationType;
   title: string;
-  participants: ConversationParticipant[];
-  speakingOrder?: SpeakingOrder;
-  groupSystemPrompt?: string;
+  modelId: string;
+  reasoningEffort?: ReasoningEffort;
   lastMessage: string | null;
   lastMessageAt: string | null;
   pinned: boolean;
@@ -213,8 +186,6 @@ export interface Message {
   role: MessageRole;
   senderModelId: string | null;
   senderName: string | null;
-  identityId: string | null;
-  participantId: string | null;
   content: string;
   images: string[];
   generatedImages: string[];

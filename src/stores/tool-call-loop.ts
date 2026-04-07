@@ -24,10 +24,10 @@ async function executeOneTool(
   toolContext?: ToolContext,
 ): Promise<{ toolCallId?: string; content: string }> {
   const builtInGloballyEnabled = builtInEnabledByName[name] !== false;
-  const builtInEnabledForIdentity =
+  const builtInEnabledForRequest =
     !!identity && allowedBuiltInToolNames != null && allowedBuiltInToolNames.has(name);
   const builtIn =
-    builtInGloballyEnabled || builtInEnabledForIdentity
+    builtInGloballyEnabled || builtInEnabledForRequest
       ? await executeBuiltInTool(name, args, toolContext)
       : null;
   if (builtIn) return { content: builtIn.success ? builtIn.content : `Error: ${builtIn.error}` };

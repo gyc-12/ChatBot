@@ -102,7 +102,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
     try {
       parsed = JSON.parse(importJson.trim());
     } catch {
-      appAlert(`${t("common.error")}: ${t("personas.importInvalidJson")}`);
+      appAlert(`${t("common.error")}: ${t("mcp.importInvalidJson")}`);
       return;
     }
 
@@ -156,7 +156,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
           (value: any) => value?.command || value?.args,
         );
         appAlert(
-          `${t("common.error")}: ${isCommandConfig && !stdioOk ? t("personas.importCommandNotSupported") : t("personas.importNoTools")}`,
+          `${t("common.error")}: ${isCommandConfig && !stdioOk ? t("mcp.importCommandNotSupported") : t("mcp.importNoTools")}`,
         );
         return;
       }
@@ -207,7 +207,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
     }
 
     if (toImport.length === 0) {
-      appAlert(`${t("common.error")}: ${t("personas.importNoTools")}`);
+      appAlert(`${t("common.error")}: ${t("mcp.importNoTools")}`);
       return;
     }
 
@@ -231,7 +231,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
       setShowImportModal(false);
       setImportJson("");
       appAlert(
-        `${t("common.success")}: ${t("personas.importSuccess", { count: addedNames.length })}\n\n${addedNames.join("\n")}`,
+        `${t("common.success")}: ${t("mcp.importSuccess", { count: addedNames.length })}\n\n${addedNames.join("\n")}`,
       );
     } catch (error) {
       appAlert(
@@ -319,7 +319,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
                   className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--secondary)] px-4 text-[13px] font-semibold text-[var(--foreground)] transition-colors duration-200 hover:bg-[var(--accent)]"
                 >
                   <Upload size={16} />
-                  {t("personas.importJson")}
+                  {t("mcp.importJson")}
                 </button>
                 <button
                   onClick={() => pushServerForm()}
@@ -379,7 +379,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
                 <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
                   <div>
                     <h3 className="text-[30px] font-bold tracking-tight text-[var(--foreground)]">
-                      {t("personas.builtInTools")}
+                      {t("mcp.builtInTools")}
                     </h3>
                     <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">
                       {t("mcp.builtInDescription")}
@@ -471,7 +471,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[var(--secondary)] px-4 text-[13px] font-semibold text-[var(--foreground)] transition-colors duration-200 active:opacity-90"
                 >
                   <Upload size={16} />
-                  {t("personas.importJson")}
+                  {t("mcp.importJson")}
                 </button>
               </div>
 
@@ -543,7 +543,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
             {visibleBuiltInTools.length > 0 ? (
               <section className="space-y-3">
                 <MobileSectionHeader
-                  title={t("personas.builtInTools")}
+                  title={t("mcp.builtInTools")}
                   detail={t("common.configured", { count: enabledBuiltInCount })}
                   description={t("mcp.builtInDescription")}
                 />
@@ -619,7 +619,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
                 style={{ borderBottom: "0.5px solid var(--border)" }}
               >
                 <span className="text-foreground text-[16px] font-semibold">
-                  {t("personas.importJson")}
+                  {t("mcp.importJson")}
                 </span>
                 <button
                   onClick={() => {
@@ -631,7 +631,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
                 </button>
               </div>
               <div className="px-5 pt-5 pb-6">
-                <p className="text-muted-foreground mb-3 text-[13px]">{t("personas.importHint")}</p>
+                <p className="text-muted-foreground mb-3 text-[13px]">{t("mcp.importHint")}</p>
                 <textarea
                   value={importJson}
                   onChange={(event) => setImportJson(event.target.value)}
@@ -658,7 +658,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
                     className="flex-1 rounded-2xl py-3 text-white active:opacity-70 disabled:opacity-50"
                     style={{ backgroundColor: "var(--foreground)" }}
                   >
-                    <span className="text-[14px] font-semibold">{t("personas.import")}</span>
+                    <span className="text-[14px] font-semibold">{t("mcp.import")}</span>
                   </button>
                 </div>
               </div>
@@ -681,7 +681,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
                   {t("common.cancel")}
                 </button>
                 <span className="text-[16px] font-semibold text-[var(--foreground)]">
-                  {t("personas.importJson")}
+                  {t("mcp.importJson")}
                 </span>
                 <div className="w-[52px]" />
               </div>
@@ -690,7 +690,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
                 style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom, 12px))" }}
               >
                 <p className="text-[13px] leading-5 text-[var(--muted-foreground)]">
-                  {t("personas.importHint")}
+                  {t("mcp.importHint")}
                 </p>
                 <textarea
                   value={importJson}
@@ -720,7 +720,7 @@ export const McpPage = forwardRef<McpPageHandle, McpPageProps>(function McpPage(
                     className="flex-1 rounded-2xl py-3 text-white active:opacity-70 disabled:opacity-50"
                     style={{ backgroundColor: "var(--foreground)" }}
                   >
-                    <span className="text-[14px] font-semibold">{t("personas.import")}</span>
+                    <span className="text-[14px] font-semibold">{t("mcp.import")}</span>
                   </button>
                 </div>
               </div>
@@ -759,5 +759,3 @@ function MobileSectionHeader({
     </div>
   );
 }
-
-

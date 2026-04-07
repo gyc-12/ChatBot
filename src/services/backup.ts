@@ -1,18 +1,17 @@
 /**
  * Config Backup & Restore service.
- * Exports/imports providers, models, identities, and MCP servers as JSON.
+ * Exports/imports providers, models, and MCP servers as JSON.
  */
-import { kvStore } from "../storage/kv-store";
-import { saveOrShareFile } from "./file-download";
-import type { Provider, Model, Identity, McpServer } from "../types";
-import type { AppSettings } from "../stores/settings-store";
+import { kvStore } from "../storage/kv-store.ts";
+import { saveOrShareFile } from "./file-download.ts";
+import type { Provider, Model, McpServer } from "../types/index.ts";
+import type { AppSettings } from "../stores/settings-store.ts";
 
 export interface BackupData {
   version: "2.0";
   exportedAt: string;
   providers: Provider[];
   models: Model[];
-  identities: Identity[];
   mcpServers: McpServer[];
   settings?: AppSettings | null;
 }
@@ -23,7 +22,6 @@ export function createBackup(): BackupData {
     exportedAt: new Date().toISOString(),
     providers: kvStore.getObject("providers") ?? [],
     models: kvStore.getObject("models") ?? [],
-    identities: kvStore.getObject("identities") ?? [],
     mcpServers: kvStore.getObject("mcp_servers") ?? [],
     settings: kvStore.getObject("settings") ?? null,
   };
@@ -46,7 +44,6 @@ export interface ImportResult {
   counts?: {
     providers: number;
     models: number;
-    identities: number;
     mcpServers: number;
     settings: boolean;
   };
@@ -62,7 +59,6 @@ export function importBackupFromString(text: string): ImportResult {
 
     if (data.providers) kvStore.setObject("providers", data.providers);
     if (data.models) kvStore.setObject("models", data.models);
-    if (data.identities) kvStore.setObject("identities", data.identities);
     if (data.mcpServers) kvStore.setObject("mcp_servers", data.mcpServers);
     if (data.settings) kvStore.setObject("settings", data.settings);
 
@@ -71,7 +67,6 @@ export function importBackupFromString(text: string): ImportResult {
       counts: {
         providers: data.providers?.length ?? 0,
         models: data.models?.length ?? 0,
-        identities: data.identities?.length ?? 0,
         mcpServers: data.mcpServers?.length ?? 0,
         settings: !!data.settings,
       },

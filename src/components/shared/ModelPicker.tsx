@@ -1,57 +1,29 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Search, Check, CheckCircle, Circle } from "lucide-react";
+import { Search, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { useProviderStore } from "../../stores/provider-store";
 import { groupModelsByProvider } from "../../lib/model-utils";
 import { getModelIcon } from "../../lib/model-icons";
-import type { Model } from "../../types";
 
 interface ModelPickerProps {
   open: boolean;
   onClose: () => void;
   onSelect: (modelId: string) => void;
   selectedModelId?: string;
-  multiSelect?: boolean;
-  onMultiSelect?: (modelIds: string[]) => void;
 }
 
-export function ModelPicker({
-  open,
-  onClose,
-  onSelect,
-  selectedModelId,
-  multiSelect,
-  onMultiSelect,
-}: ModelPickerProps) {
+export function ModelPicker({ open, onClose, onSelect, selectedModelId }: ModelPickerProps) {
   const { t } = useTranslation();
   const models = useProviderStore((s) => s.models);
   const getProviderById = useProviderStore((s) => s.getProviderById);
   const [search, setSearch] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (open) {
-      setSelectedIds(new Set());
       setSearch("");
     }
   }, [open]);
-
-  const toggleModel = useCallback((modelId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(modelId)) next.delete(modelId);
-      else next.add(modelId);
-      return next;
-    });
-  }, []);
-
-  const handleConfirm = useCallback(() => {
-    if (selectedIds.size > 0 && onMultiSelect) {
-      onMultiSelect(Array.from(selectedIds));
-    }
-    onClose();
-  }, [selectedIds, onMultiSelect, onClose]);
 
   const enabledModels = useMemo(() => models.filter((m) => m.enabled), [models]);
 
@@ -73,9 +45,7 @@ export function ModelPicker({
       <DialogContent className="flex max-h-[70vh] max-w-sm flex-col gap-0 overflow-hidden rounded-[24px] p-0">
         <div className="px-5 pt-5 pb-3">
           <DialogHeader>
-            <DialogTitle className="text-[17px] font-semibold">
-              {multiSelect ? t("chat.addMember") : t("chat.selectModel")}
-            </DialogTitle>
+            <DialogTitle className="text-[17px] font-semibold">{t("chat.selectModel")}</DialogTitle>
           </DialogHeader>
 
           {/* Search */}
@@ -111,22 +81,15 @@ export function ModelPicker({
 
                 {/* Model items */}
                 {section.data.map((model) => {
-                  const isSelected = multiSelect
-                    ? selectedIds.has(model.id)
-                    : model.id === selectedModelId;
-                  const showModelId =
-                    model.modelId !== model.displayName;
+                  const isSelected = model.id === selectedModelId;
+                  const showModelId = model.modelId !== model.displayName;
 
                   return (
                     <button
                       key={model.id}
                       onClick={() => {
-                        if (multiSelect) {
-                          toggleModel(model.id);
-                        } else {
-                          onSelect(model.id);
-                          onClose();
-                        }
+                        onSelect(model.id);
+                        onClose();
                       }}
                       className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors active:opacity-70"
                       style={{
@@ -158,19 +121,12 @@ export function ModelPicker({
                           </p>
                         )}
                       </div>
-                      {multiSelect ? (
-                        isSelected ? (
-                          <CheckCircle size={20} className="flex-shrink-0 text-[var(--foreground)]" />
-                        ) : (
-                          <Circle
-                            size={20}
-                            className="flex-shrink-0 text-[var(--muted-foreground)] opacity-40"
-                          />
-                        )
-                      ) : (
-                        isSelected && (
-                          <Check size={16} strokeWidth={2.5} className="flex-shrink-0 text-[var(--foreground)]" />
-                        )
+                      {isSelected && (
+                        <Check
+                          size={16}
+                          strokeWidth={2.5}
+                          className="flex-shrink-0 text-[var(--foreground)]"
+                        />
                       )}
                     </button>
                   );
@@ -179,21 +135,6 @@ export function ModelPicker({
             ))
           )}
         </div>
-
-        {/* Confirm button for multi-select */}
-        {multiSelect && (
-          <div className="border-t px-5 py-3" style={{ borderColor: "var(--border)" }}>
-            <button
-              onClick={handleConfirm}
-              disabled={selectedIds.size === 0}
-              className="w-full rounded-2xl py-2.5 text-[15px] font-semibold transition-opacity disabled:opacity-40"
-              style={{ backgroundColor: "var(--foreground)", color: "var(--primary-foreground)" }}
-            >
-              {t("common.confirm")}
-              {selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
-            </button>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );

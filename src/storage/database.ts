@@ -5,6 +5,13 @@
  */
 import type { Message, Conversation, MessageBlock } from "../types";
 import { MessageStatus, MessageBlockType, MessageBlockStatus } from "../types";
+import { coerceConversationToSingle } from "../lib/conversation-single";
+import {
+  buildConversationInsertStatement,
+  buildMessageInsertStatement,
+  getConversationTableDefinition,
+  getMessageTableDefinition,
+} from "../lib/database-schema-single";
 
 // Dynamic import to avoid SSR issues and allow fallback
 let _db: any = null;
@@ -226,20 +233,19 @@ function safeJsonParse<T>(value: unknown, fallback: T): T {
 }
 
 function rowToConversation(row: any): Conversation {
-  return {
+  return coerceConversationToSingle({
     id: row.id,
-    type: row.type || "single",
     title: row.title || "",
+    modelId: row.modelId ?? undefined,
+    reasoningEffort: row.reasoningEffort ?? undefined,
     participants: safeJsonParse(row.participants, []),
-    speakingOrder: row.speakingOrder ?? undefined,
     lastMessage: row.lastMessage ?? null,
     lastMessageAt: row.lastMessageAt ?? null,
     pinned: row.pinned === 1,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     workspaceDir: row.workspaceDir ?? undefined,
-    groupSystemPrompt: row.groupSystemPrompt ?? undefined,
-  };
+  });
 }
 
 function rowToMessage(row: any): Message {
@@ -249,8 +255,6 @@ function rowToMessage(row: any): Message {
     role: row.role,
     senderModelId: row.senderModelId ?? null,
     senderName: row.senderName ?? null,
-    identityId: row.identityId ?? null,
-    participantId: row.participantId ?? null,
     content: row.content || "",
     images: safeJsonParse(row.images, []),
     generatedImages: safeJsonParse(row.generatedImages, []),
@@ -285,65 +289,26 @@ function rowToBlock(row: any): MessageBlock {
 // ─── Init ───
 export async function initDatabase(): Promise<void> {
   const db = await getDb();
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS conversations (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL DEFAULT 'single',
-      title TEXT NOT NULL DEFAULT '',
-      participants TEXT NOT NULL DEFAULT '[]',
-      speakingOrder TEXT,
-      lastMessage TEXT,
-      lastMessageAt TEXT,
-      pinned INTEGER NOT NULL DEFAULT 0,
-      createdAt TEXT NOT NULL,
-      updatedAt TEXT NOT NULL
-    )
-  `);
-  // Migration: add speakingOrder column for databases created before this field existed
-  try {
-    await db.execute(`ALTER TABLE conversations ADD COLUMN speakingOrder TEXT`);
-  } catch {
-    /* column already exists */
-  }
+  await db.execute(getConversationTableDefinition());
   // Migration: add workspaceDir column
   try {
     await db.execute(`ALTER TABLE conversations ADD COLUMN workspaceDir TEXT`);
   } catch {
     /* column already exists */
   }
-  // Migration: add groupSystemPrompt column
+  // Migration: add modelId column
   try {
-    await db.execute(`ALTER TABLE conversations ADD COLUMN groupSystemPrompt TEXT`);
+    await db.execute(`ALTER TABLE conversations ADD COLUMN modelId TEXT`);
   } catch {
     /* column already exists */
   }
-
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS messages (
-      id TEXT PRIMARY KEY,
-      conversationId TEXT NOT NULL,
-      role TEXT NOT NULL,
-      senderModelId TEXT,
-      senderName TEXT,
-      identityId TEXT,
-      participantId TEXT,
-      content TEXT NOT NULL DEFAULT '',
-      images TEXT NOT NULL DEFAULT '[]',
-      generatedImages TEXT NOT NULL DEFAULT '[]',
-      reasoningContent TEXT,
-      reasoningDuration REAL,
-      toolCalls TEXT NOT NULL DEFAULT '[]',
-      toolResults TEXT NOT NULL DEFAULT '[]',
-      branchId TEXT,
-      parentMessageId TEXT,
-      isStreaming INTEGER NOT NULL DEFAULT 0,
-      status TEXT NOT NULL DEFAULT 'success',
-      errorMessage TEXT,
-      tokenUsage TEXT,
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (conversationId) REFERENCES conversations(id) ON DELETE CASCADE
-    )
-  `);
+  // Migration: add reasoningEffort column
+  try {
+    await db.execute(`ALTER TABLE conversations ADD COLUMN reasoningEffort TEXT`);
+  } catch {
+    /* column already exists */
+  }
+  await db.execute(getMessageTableDefinition());
   await db.execute(
     `CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversationId)`,
   );
@@ -371,24 +336,8 @@ export async function initDatabase(): Promise<void> {
 // ─── Conversations ───
 export async function insertConversation(conv: Conversation): Promise<void> {
   const db = await getDb();
-  await db.execute(
-    `INSERT INTO conversations (id, type, title, participants, speakingOrder, lastMessage, lastMessageAt, pinned, createdAt, updatedAt, workspaceDir, groupSystemPrompt)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-    [
-      conv.id,
-      conv.type,
-      conv.title,
-      JSON.stringify(conv.participants),
-      conv.speakingOrder ?? null,
-      conv.lastMessage,
-      conv.lastMessageAt,
-      conv.pinned ? 1 : 0,
-      conv.createdAt,
-      conv.updatedAt,
-      conv.workspaceDir ?? null,
-      conv.groupSystemPrompt ?? null,
-    ],
-  );
+  const statement = buildConversationInsertStatement(conv);
+  await db.execute(statement.sql, statement.params);
 }
 
 export async function updateConversation(
@@ -400,19 +349,19 @@ export async function updateConversation(
   const params: any[] = [new Date().toISOString()];
   let idx = 2;
 
-  if (updates.type !== undefined) {
-    sets.push(`type = $${idx}`);
-    params.push(updates.type);
-    idx++;
-  }
   if (updates.title !== undefined) {
     sets.push(`title = $${idx}`);
     params.push(updates.title);
     idx++;
   }
-  if (updates.participants !== undefined) {
-    sets.push(`participants = $${idx}`);
-    params.push(JSON.stringify(updates.participants));
+  if (updates.modelId !== undefined) {
+    sets.push(`modelId = $${idx}`);
+    params.push(updates.modelId);
+    idx++;
+  }
+  if (updates.reasoningEffort !== undefined) {
+    sets.push(`reasoningEffort = $${idx}`);
+    params.push(updates.reasoningEffort ?? null);
     idx++;
   }
   if (updates.lastMessage !== undefined) {
@@ -430,19 +379,9 @@ export async function updateConversation(
     params.push(updates.pinned ? 1 : 0);
     idx++;
   }
-  if (updates.speakingOrder !== undefined) {
-    sets.push(`speakingOrder = $${idx}`);
-    params.push(updates.speakingOrder);
-    idx++;
-  }
   if (updates.workspaceDir !== undefined) {
     sets.push(`workspaceDir = $${idx}`);
     params.push(updates.workspaceDir || null);
-    idx++;
-  }
-  if (updates.groupSystemPrompt !== undefined) {
-    sets.push(`groupSystemPrompt = $${idx}`);
-    params.push(updates.groupSystemPrompt || null);
     idx++;
   }
 
@@ -477,35 +416,8 @@ export async function getConversation(id: string): Promise<Conversation | null> 
 // ─── Messages ───
 export async function insertMessage(msg: Message): Promise<void> {
   const db = await getDb();
-  await db.execute(
-    `INSERT INTO messages (id, conversationId, role, senderModelId, senderName, identityId, participantId,
-     content, images, generatedImages, reasoningContent, reasoningDuration,
-     toolCalls, toolResults, branchId, parentMessageId, isStreaming, status, errorMessage, tokenUsage, createdAt)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
-    [
-      msg.id,
-      msg.conversationId,
-      msg.role,
-      msg.senderModelId,
-      msg.senderName,
-      msg.identityId,
-      msg.participantId,
-      msg.content,
-      JSON.stringify(msg.images ?? []),
-      JSON.stringify(msg.generatedImages ?? []),
-      msg.reasoningContent,
-      msg.reasoningDuration,
-      JSON.stringify(msg.toolCalls),
-      JSON.stringify(msg.toolResults),
-      msg.branchId,
-      msg.parentMessageId,
-      msg.isStreaming ? 1 : 0,
-      msg.status ?? MessageStatus.SUCCESS,
-      msg.errorMessage ?? null,
-      msg.tokenUsage ? JSON.stringify(msg.tokenUsage) : null,
-      msg.createdAt,
-    ],
-  );
+  const statement = buildMessageInsertStatement(msg);
+  await db.execute(statement.sql, statement.params);
 }
 
 export async function updateMessage(id: string, updates: Partial<Message>): Promise<void> {
@@ -569,12 +481,6 @@ export async function updateMessage(id: string, updates: Partial<Message>): Prom
     params.push(updates.tokenUsage ? JSON.stringify(updates.tokenUsage) : null);
     idx++;
   }
-  if (updates.participantId !== undefined) {
-    sets.push(`participantId = $${idx}`);
-    params.push(updates.participantId);
-    idx++;
-  }
-
   if (sets.length === 0) return;
   params.push(id);
   await db.execute(`UPDATE messages SET ${sets.join(", ")} WHERE id = $${idx}`, params);

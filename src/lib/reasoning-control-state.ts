@@ -1,9 +1,9 @@
-import type { ConversationParticipant, Model, ReasoningEffort } from "../types";
+import type { Conversation, Model, ReasoningEffort } from "../types";
 import { supportsReasoningControls } from "./model-utils.ts";
 
 export function getReasoningControlState(
   model: Pick<Model, "capabilities" | "capabilitiesVerified"> | null | undefined,
-  participant: Pick<ConversationParticipant, "reasoningEffort"> | null | undefined,
+  conversation: Pick<Conversation, "reasoningEffort"> | null | undefined,
 ): {
   canConfigureReasoning: boolean;
   reasoningEffort: ReasoningEffort | undefined;
@@ -12,6 +12,6 @@ export function getReasoningControlState(
 
   return {
     canConfigureReasoning,
-    reasoningEffort: canConfigureReasoning ? participant?.reasoningEffort : undefined,
+    reasoningEffort: canConfigureReasoning ? conversation?.reasoningEffort : undefined,
   };
 }

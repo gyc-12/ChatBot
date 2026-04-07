@@ -1,15 +1,15 @@
 /**
  * Chat generation — extracted from chat-store.ts.
- * Handles streaming SSE generation for a single participant,
+ * Handles streaming SSE generation for a single conversation model,
  * including tool calls, think-tag parsing, and context compression.
  */
-import type { Message, Conversation, ConversationParticipant } from "../types";
+import type { Message, Conversation } from "../types";
 import { MessageStatus } from "../types";
 import { useProviderStore } from "./provider-store";
 import { useBuiltInToolsStore } from "./built-in-tools-store";
 import {
-  getParticipantLabel,
-  buildApiMessagesForParticipant,
+  getConversationModelLabel,
+  buildApiMessagesForConversation,
   createAssistantMessage,
 } from "./chat-message-builder";
 import {
@@ -20,7 +20,7 @@ import {
 } from "../storage/database";
 import { notifyDbChange } from "../hooks/useDatabase";
 import { getBuiltInToolDefs } from "../services/built-in-tools";
-import { getMcpToolDefsForIdentity, refreshMcpConnections } from "../services/mcp";
+import { getEnabledMcpToolDefs, refreshMcpConnections } from "../services/mcp";
 import { generateId } from "../lib/id";
 import { buildProviderHeaders } from "../services/provider-headers";
 import { getAdapter } from "../services/provider-adapters";
@@ -64,16 +64,15 @@ export interface GenerationContext {
 // ── Main generation function ──
 
 /**
- * Generate a response for a single participant.
+ * Generate a response for a single conversation model.
  * Returns the assistant's response content.
  */
 export async function generateForParticipant(
   ctx: GenerationContext,
-  participant: ConversationParticipant,
   index: number,
 ): Promise<string> {
   const providerStore = useProviderStore.getState();
-  const model = providerStore.getModelById(participant.modelId);
+  const model = providerStore.getModelById(ctx.conversation.modelId);
   const provider = model ? providerStore.getProviderById(model.providerId) : null;
   if (!model || !provider) return "";
 
@@ -89,9 +88,7 @@ export async function generateForParticipant(
       conversationId: ctx.cid,
       role: "assistant",
       senderModelId: model.id,
-      senderName: getParticipantLabel(participant, ctx.conversation.participants),
-      identityId: null,
-      participantId: participant.id,
+      senderName: getConversationModelLabel(ctx.conversation),
       content: "",
       images: [],
       generatedImages: [],
@@ -126,12 +123,11 @@ export async function generateForParticipant(
     return "";
   }
 
-  // Single-chat mode no longer binds model personas/identities.
   const identity = undefined;
   const allowedBuiltInToolNames = null;
   const allowedServerIds = undefined;
   const builtInEnabledByName = useBuiltInToolsStore.getState().enabledByName;
-  const senderName = getParticipantLabel(participant, ctx.conversation.participants);
+  const senderName = getConversationModelLabel(ctx.conversation);
 
   // Create assistant message skeleton
   const assistantMsgId = generateId();
@@ -140,8 +136,6 @@ export async function generateForParticipant(
     ctx.cid,
     model.id,
     senderName,
-    participant.id,
-    null,
     ctx.activeBranchId,
     msgCreatedAt,
   );
@@ -175,7 +169,7 @@ export async function generateForParticipant(
       return builtInEnabledByName[name] !== false;
     });
   })();
-  const toolDefs = [...builtInToolDefs, ...getMcpToolDefsForIdentity()];
+  const toolDefs = [...builtInToolDefs, ...getEnabledMcpToolDefs()];
 
   try {
     // Build API messages with compression
@@ -190,7 +184,7 @@ export async function generateForParticipant(
 
     const adapter = getAdapter(provider.apiFormat);
 
-    let apiMessages = buildApiMessagesForParticipant(filtered, participant, ctx.conversation, {
+    let apiMessages = buildApiMessagesForConversation(filtered, ctx.conversation, {
       workspaceTree: ctx.workspaceTree,
       workspaceFiles: ctx.workspaceFiles,
     });
@@ -204,7 +198,7 @@ export async function generateForParticipant(
     );
 
     const reasoningEffort =
-      participant.reasoningEffort ||
+      ctx.conversation.reasoningEffort ||
       (provider.apiFormat === "anthropic-messages"
         ? undefined
         : model.capabilities?.reasoning

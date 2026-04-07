@@ -32,7 +32,6 @@
   "tabs": {
     "chats": "聊天",
     "models": "模型",
-    "personas": "角色",
     "settings": "设置"
   },
   "layout": {
@@ -47,7 +46,6 @@
     "searchChats": "搜索对话...",
     "filterAll": "全部",
     "filterSingle": "单聊",
-    "filterGroups": "群聊",
     "noConversations": "暂无对话",
     "goToModels": "前往模型页面开始聊天",
     "startConversation": "开始新对话",
@@ -56,16 +54,13 @@
     "emptyDescriptionDesktop": "专注于当前对话，其他一切都退到幕后。",
     "emptyDescriptionMobile": "ChatBot 已准备好帮助你思考、写作、调试，并保持清爽有序的对话历史。",
     "newChat": "新对话",
-    "groupChat": "群聊",
     "reasoning": "推理",
     "vision": "视觉",
     "noResults": "没有匹配的对话"
   },
   "chat": {
     "you": "你",
-    "group": "群聊",
     "chatTitle": "对话",
-    "mountIdentity": "选择角色",
     "thoughtProcess": "思考过程",
     "branchConversation": "分支对话",
     "branchConfirm": "从此消息创建新分支？",
@@ -96,36 +91,19 @@
     "photoPermissionDenied": "需要相册访问权限才能附加图片。",
     "imageSelected": "已选择图片",
     "selectModel": "选择模型",
-    "messageGroup": "输入消息，用 @ 提及模型...",
     "message": "发送消息...",
     "send": "发送",
     "newLine": "换行",
     "called": "调用：{{name}}",
     "modelCount": "{{count}} 个模型",
-    "noIdentity": "未设置角色",
-    "setRoleFor": "为 {{name}} 设置角色",
     "micPermissionDenied": "需要麦克风权限才能使用语音输入。",
     "noSttProvider": "未配置支持语音转文字的 OpenAI 兼容供应商。请添加支持 Whisper API 的供应商。",
     "rewrite": "重写",
     "translate": "翻译",
     "summarize": "总结",
     "rename": "重命名",
-    "addMember": "添加成员",
-    "duplicateGroup": "复制当前群组",
-    "selectRole": "选择角色",
-    "alreadyInGroup": "已在群聊",
     "nSelected": "已选 {{count}} 个",
     "switchModel": "切换模型",
-    "removeMember": "移除",
-    "removeMemberConfirm": "确定将此模型移出群聊？",
-    "noAvailableModels": "没有可添加的模型",
-    "cannotRemoveLast": "无法移除最后一个成员",
-    "speakingOrder": "发言顺序",
-    "sequential": "顺序发言",
-    "random": "随机抢答",
-    "parallel": "同时回复",
-    "groupPrompt": "群聊提示词",
-    "groupPromptPlaceholder": "为所有参与者设置共享提示词…",
     "autoDiscuss": "托管讨论",
     "autoDiscussHint": "系统将自动代替你发送“继续”来驱动讨论",
     "autoDiscussRounds": "{{count}} 轮",
@@ -154,35 +132,7 @@
     "noModels": "暂无模型",
     "configureHint": "配置供应商以获取可用模型",
     "configureProvider": "配置供应商",
-    "selectModels": "选择模型",
-    "selectModelsHint": "至少选择 2 个模型以创建群聊。",
-    "createGroup": "创建群聊 ({{count}})"
-  },
-  "personas": {
-    "searchIdentities": "搜索角色...",
-    "title": "角色",
-    "identityCards": "角色卡片",
-    "mcpTools": "MCP 工具",
-    "deleteIdentity": "删除角色",
-    "deleteTool": "删除工具",
-    "createIdentity": "创建新角色",
-    "addTool": "添加 MCP 工具",
-    "temp": "温度：{{value}}",
-    "tools": "工具：{{count}}",
-    "editIdentity": "编辑角色",
-    "removeRole": "移除角色",
-    "removeRoleHint": "清除当前角色设定",
-    "editTool": "编辑工具",
-    "builtInTools": "内置工具",
-    "noCustomTools": "暂无自定义 MCP 工具",
-    "importJson": "JSON 导入",
-    "import": "导入",
-    "importHint": "粘贴 MCP 服务器配置 JSON。支持 {mcpServers: {...}}、数组或单个对象格式。",
-    "importNoTools": "JSON 中未找到有效工具",
-    "importInvalidJson": "JSON 格式无效",
-    "importSuccess": "成功导入 {{count}} 个服务器，请开启以验证连接",
-    "importCommandNotSupported": "这是桌面端 MCP 配置（npx/uvx 命令），手机端仅支持基于 URL 的远程 MCP 服务器。请使用包含 \"url\" 字段的配置。",
-    "importDiscoveryFailed": "无法于源主下找到工具"
+    "selectModels": "选择模型"
   },
   "mcp": {
     "pageTitle": "模型上下文协议",
@@ -199,9 +149,18 @@
     "serverResources": "服务器资源",
     "activeServers": "在线服务器",
     "connectedTools": "已连接工具",
+    "toolsLabel": "工具",
     "enabledBuiltIns": "已启用内置工具",
     "builtInDescription": "这些内置工具可直接在当前应用中启用，无需额外部署服务器。",
-    "availableTools": "可用工具 ({{count}})"
+    "availableTools": "可用工具 ({{count}})",
+    "builtInTools": "内置工具",
+    "importJson": "JSON 导入",
+    "import": "导入",
+    "importHint": "粘贴 MCP 服务器配置 JSON。支持 {mcpServers: {...}}、数组或单个对象格式。",
+    "importNoTools": "JSON 中未找到有效工具",
+    "importInvalidJson": "JSON 格式无效",
+    "importSuccess": "成功导入 {{count}} 个服务器，请开启以验证连接",
+    "importCommandNotSupported": "这是桌面端 MCP 配置（npx/uvx 命令），手机端仅支持基于 URL 的远程 MCP 服务器。请使用包含 \"url\" 字段的配置。"
   },
   "settings": {
     "title": "设置",
@@ -370,28 +329,6 @@
     "ipNotDetected": "无法自动检测 WiFi IP，请将 0.0.0.0 替换为手机的 WiFi IP（在手机 WiFi 设置中查看）。",
     "pairingCodeLabel": "安全配对码（网页端已自动填入）"
   },
-  "identityEdit": {
-    "name": "名称",
-    "namePlaceholder": "例如：高级架构师",
-    "icon": "图标",
-    "systemPrompt": "系统提示词",
-    "systemPromptPlaceholder": "你是一个...",
-    "parameters": "参数",
-    "temperature": "温度",
-    "bindTools": "绑定 MCP 工具",
-    "createIdentity": "创建角色",
-    "saveChanges": "保存更改",
-    "nameRequired": "名称为必填项",
-    "promptRequired": "系统提示词为必填项",
-    "aiGenerate": "AI 生成",
-    "aiDescPlaceholder": "描述你想要的角色，例如「一个 React Native 专家」",
-    "aiDescRequired": "请先输入描述",
-    "aiSelectModel": "选择模型",
-    "selectModel": "选择模型",
-    "generate": "生成",
-    "builtIn": "内置",
-    "globalEnabled": "全局"
-  },
   "toolEdit": {
     "name": "名称",
     "namePlaceholder": "例如：日历读取器",
@@ -443,59 +380,5 @@
     "tapToRender": "点击渲染预览",
     "lazyLoaded": "按需加载以提升性能",
     "fullscreen": "HTML 预览"
-  },
-  "presets": {
-    "socrates": {
-      "name": "苏格拉底",
-      "prompt": "你从不直接给出答案。通过提出尖锐、有针对性的问题，引导用户自己思考问题。帮助他们一步步理清自己的思路。"
-    },
-    "blunt": {
-      "name": "直言不讳",
-      "prompt": "你极其坦率和直接。穿透表象，指出真正的问题，毫不粉饰地给出你的观点。不废话，不含糊。"
-    },
-    "warm": {
-      "name": "暖心伙伴",
-      "prompt": "你温暖、耐心、善解人意。在给建议之前，先理解和回应用户的感受。用鼓励和支持的语气交流。"
-    },
-    "minimalist": {
-      "name": "极简主义",
-      "prompt": "你惜字如金。用尽可能少的字回答。能一句话说完绝不用两句。不寒暄，不废话，只给答案。"
-    },
-    "divergent": {
-      "name": "发散大师",
-      "prompt": "你是疯狂的头脑风暴伙伴。快速产出大量想法，建立意想不到的联系，不否定任何看似疯狂的点子。先求量，再求质。"
-    },
-    "roast": {
-      "name": "毒舌损友",
-      "prompt": "你说话犀利，喜欢吐槽，但本质上是在帮忙。用机智的讽刺和俏皮的调侃来包装建议。要搞笑，不要刻薄。"
-    },
-    "humor": {
-      "name": "幽默模式",
-      "prompt": "你把一切都变成幽默。用笑话、双关语和有趣的类比来解释事情。保持轻松有趣的同时，确保内容有价值。"
-    },
-    "debate": {
-      "name": "辩论对手",
-      "prompt": "你总是站在用户观点的对立面。挑战他们的假设，找出他们推理中的漏洞，迫使他们为自己的立场辩护。保持严谨的思辨，但态度尊重。"
-    },
-    "eli5": {
-      "name": "幼儿园老师",
-      "prompt": "像给5岁小孩解释一样回答所有问题。用简单的词汇、生动的比喻和日常生活中的例子。把复杂概念拆成一小块一小块的。不用术语，不用抽象概念。"
-    },
-    "detective": {
-      "name": "侦探模式",
-      "prompt": "你像侦探一样对待每个问题。收集线索，追问细节，摆出证据，一步步推理后再给出结论。像经验丰富的调查员一样边思考边说出推理过程。"
-    },
-    "motivator": {
-      "name": "鸡血教练",
-      "prompt": "你是一个极其充满活力和正能量的教练。给用户打气，庆祝他们的每一点进步，推动他们行动起来。把每个挫折变成经验，把每个目标变成可以实现的事。"
-    },
-    "timeTraveler": {
-      "name": "时间旅行者",
-      "prompt": "你是一位来自文艺复兴时期的学者，穿越到了现代。结合历史智慧和现代知识来回答问题。引用过去伟大思想家的观点，对世界的变化表示惊叹。"
-    },
-    "nonsense": {
-      "name": "胡说教授",
-      "prompt": "你是一个极度自信的教授，专门一本正经地胡说八道。引用根本不存在的研究，捏造统计数据，提及虚构的专家。用极其学术和严肃的语气说出荒谬至极的内容。永远不要打破人设，也不要承认自己在瞎编。"
-    }
   }
 }

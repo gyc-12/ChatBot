@@ -1,11 +1,6 @@
 import type { Conversation, Message } from "../types";
 import { MessageStatus } from "../types";
-import {
-  buildApiMessagesForParticipant,
-  createUserMessage,
-  extractMentionedParticipants,
-  resolveTargetParticipants,
-} from "./chat-message-builder";
+import { buildApiMessagesForConversation, createUserMessage } from "./chat-message-builder";
 import {
   getConversation,
   getRecentMessages,
@@ -27,12 +22,10 @@ import i18n from "../i18n";
 import { buildWorkspaceContextBundle } from "../services/workspace";
 
 const MAX_HISTORY = 200;
-const MAX_MENTION_ROUNDS = 2;
 
 export async function preComputeCompression(
   cid: string,
   conversation: Conversation,
-  targets: Conversation["participants"],
   userMsg: Message,
   abortController: AbortController,
   activeBranchId: string | null,
@@ -40,33 +33,33 @@ export async function preComputeCompression(
   workspaceContext?: { tree?: string; files: Array<{ path: string; content: string }> },
 ): Promise<string | null> {
   const compressionSettings = useSettingsStore.getState().settings;
-  if (!compressionSettings.contextCompressionEnabled || targets.length === 0) return null;
+  if (!compressionSettings.contextCompressionEnabled) return null;
 
   const providerStore = useProviderStore.getState();
-  const firstModel = providerStore.getModelById(targets[0].modelId);
-  const firstProvider = firstModel ? providerStore.getProviderById(firstModel.providerId) : null;
-  if (!firstModel || !firstProvider || firstProvider.type !== "openai") return null;
+  const model = providerStore.getModelById(conversation.modelId);
+  const provider = model ? providerStore.getProviderById(model.providerId) : null;
+  if (!model || !provider || provider.type !== "openai") return null;
 
   const allMsgs = sourceMessages ?? (await getRecentMessages(cid, activeBranchId, MAX_HISTORY));
   const filtered = allMsgs.filter(
     (message) => message.status === MessageStatus.SUCCESS || message.id === userMsg.id,
   );
-  const sampleApiMessages = buildApiMessagesForParticipant(filtered, targets[0], conversation, {
+  const sampleApiMessages = buildApiMessagesForConversation(filtered, conversation, {
     workspaceTree: workspaceContext?.tree,
     workspaceFiles: workspaceContext?.files,
   });
   const tokenCount = estimateMessagesTokens(sampleApiMessages);
   if (tokenCount <= compressionSettings.contextCompressionThreshold) return null;
 
-  const baseUrl = firstProvider.baseUrl.replace(/\/+$/, "");
-  const headers = buildProviderHeaders(firstProvider, { "Content-Type": "application/json" });
+  const baseUrl = provider.baseUrl.replace(/\/+$/, "");
+  const headers = buildProviderHeaders(provider, { "Content-Type": "application/json" });
   const result = await compressIfNeeded(sampleApiMessages, {
     maxTokens: compressionSettings.contextCompressionThreshold,
     keepRecentCount: 6,
     baseUrl,
     headers,
-    model: firstModel.modelId,
-    apiFormat: firstProvider.apiFormat,
+    model: model.modelId,
+    apiFormat: provider.apiFormat,
     signal: abortController.signal,
   });
   if (!result.compressed) return null;
@@ -85,8 +78,6 @@ export async function dispatchMessageGeneration(args: {
   images?: string[];
   options?: {
     reuseUserMessageId?: string;
-    mentionedParticipantIds?: string[];
-    targetParticipantIds?: string[];
     contextUntilMessageId?: string;
   };
   activeBranchId: string | null;
@@ -144,18 +135,12 @@ export async function dispatchMessageGeneration(args: {
   abortControllers.set(cid, abortController);
   if (cid === getCurrentConversationId()) setStoreState({ isGenerating: true });
 
-  const targetIds = options?.targetParticipantIds;
-  const targets = resolveTargetParticipants(
-    conversation,
-    targetIds && targetIds.length > 0 ? targetIds : options?.mentionedParticipantIds,
-  );
   const workspaceContext = conversation.workspaceDir
     ? await buildWorkspaceContextBundle(conversation.workspaceDir, text, { includeTree: true })
     : { files: [] as Array<{ path: string; content: string }>, tree: undefined };
   const cachedCompressionSummary = await preComputeCompression(
     cid,
     conversation,
-    targets,
     userMsg,
     abortController,
     activeBranchId,
@@ -164,7 +149,6 @@ export async function dispatchMessageGeneration(args: {
   );
   const compressionSettings = useSettingsStore.getState().settings;
 
-  const isRetry = !!(options?.reuseUserMessageId && options?.targetParticipantIds?.length);
   const ctx: GenerationContext = {
     cid,
     conversation,
@@ -179,56 +163,13 @@ export async function dispatchMessageGeneration(args: {
     setStoreState: (partial) => setStoreState(partial),
     workspaceTree: workspaceContext.tree,
     workspaceFiles: workspaceContext.files,
-    isRetry,
+    isRetry: !!options?.reuseUserMessageId,
     sourceMessages,
   };
 
-  let globalMsgIndex = 0;
   try {
-    let currentTargets = targets;
-    for (let round = 0; round <= MAX_MENTION_ROUNDS; round++) {
-      if (abortController.signal.aborted || currentTargets.length === 0) break;
-
-      const responses: { participantId: string; content: string }[] = [];
-      if (conversation.speakingOrder === "parallel" && currentTargets.length > 1) {
-        const baseIndex = globalMsgIndex;
-        const results = await Promise.all(
-          currentTargets.map((target, index) =>
-            generateForParticipant(ctx, target, baseIndex + index),
-          ),
-        );
-        globalMsgIndex += currentTargets.length;
-        currentTargets.forEach((target, index) =>
-          responses.push({ participantId: target.id, content: results[index] }),
-        );
-      } else {
-        for (let index = 0; index < currentTargets.length; index++) {
-          if (abortController.signal.aborted) break;
-          const content = await generateForParticipant(
-            ctx,
-            currentTargets[index],
-            globalMsgIndex++,
-          );
-          responses.push({ participantId: currentTargets[index].id, content });
-        }
-      }
-
-      if (conversation.type !== "group" || round >= MAX_MENTION_ROUNDS) break;
-      const mentionedIds = new Set<string>();
-      for (const response of responses) {
-        if (!response.content) continue;
-        const ids = extractMentionedParticipants(
-          response.content,
-          conversation,
-          response.participantId,
-        );
-        for (const id of ids) mentionedIds.add(id);
-      }
-      for (const response of responses) mentionedIds.delete(response.participantId);
-      if (mentionedIds.size === 0) break;
-      currentTargets = conversation.participants.filter((participant) =>
-        mentionedIds.has(participant.id),
-      );
+    if (!abortController.signal.aborted) {
+      await generateForParticipant(ctx, 0);
     }
   } finally {
     abortControllers.delete(cid);
@@ -256,8 +197,6 @@ export async function runAutoDiscuss(args: {
     images?: string[],
     options?: {
       reuseUserMessageId?: string;
-      mentionedParticipantIds?: string[];
-      targetParticipantIds?: string[];
       contextUntilMessageId?: string;
     },
   ) => Promise<void>;
@@ -267,8 +206,7 @@ export async function runAutoDiscuss(args: {
   if (!convId) return;
 
   const conversation = await getConversation(convId);
-  if (!conversation || conversation.type !== "group" || conversation.participants.length < 2)
-    return;
+  if (!conversation) return;
 
   args.setStoreState({ autoDiscussRemaining: rounds, autoDiscussTotalRounds: rounds });
 

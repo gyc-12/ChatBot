@@ -32,7 +32,6 @@
   "tabs": {
     "chats": "Chats",
     "models": "Models",
-    "personas": "Personas",
     "settings": "Settings"
   },
   "layout": {
@@ -47,7 +46,6 @@
     "searchChats": "Search chats...",
     "filterAll": "All",
     "filterSingle": "Single",
-    "filterGroups": "Groups",
     "noConversations": "No conversations yet",
     "goToModels": "Go to Models tab to start chatting",
     "startConversation": "Start a conversation",
@@ -56,16 +54,13 @@
     "emptyDescriptionDesktop": "Focus on the conversation. Everything else gets out of the way.",
     "emptyDescriptionMobile": "ChatBot is ready to help you think, write, debug, and keep a focused chat history.",
     "newChat": "New Chat",
-    "groupChat": "Group Chat",
     "reasoning": "Reasoning",
     "vision": "Vision",
     "noResults": "No matching conversations"
   },
   "chat": {
     "you": "You",
-    "group": "Group",
     "chatTitle": "Chat",
-    "mountIdentity": "Select Role",
     "thoughtProcess": "Thought process",
     "branchConversation": "Branch Conversation",
     "branchConfirm": "Create a new branch from this message?",
@@ -96,36 +91,19 @@
     "photoPermissionDenied": "Photo library access is required to attach images.",
     "imageSelected": "Image Selected",
     "selectModel": "Select Model",
-    "messageGroup": "Type message, use @ to mention...",
     "message": "Message...",
     "send": "send",
     "newLine": "new line",
     "called": "Called: {{name}}",
     "modelCount": "{{count}} models",
-    "noIdentity": "No role",
-    "setRoleFor": "Set role for {{name}}",
     "micPermissionDenied": "Microphone access is required for voice input.",
     "noSttProvider": "No OpenAI-compatible provider configured for speech-to-text. Please add a provider that supports the Whisper API.",
     "rewrite": "Rewrite",
     "translate": "Translate",
     "summarize": "Summarize",
     "rename": "Rename",
-    "addMember": "Add Member",
-    "duplicateGroup": "Duplicate Group",
-    "selectRole": "Select Role",
-    "alreadyInGroup": "Already in group",
     "nSelected": "{{count}} selected",
     "switchModel": "Switch Model",
-    "removeMember": "Remove",
-    "removeMemberConfirm": "Remove this model from the group?",
-    "noAvailableModels": "No available models to add",
-    "cannotRemoveLast": "Cannot remove the last member",
-    "speakingOrder": "Speaking Order",
-    "sequential": "Sequential",
-    "random": "Random",
-    "parallel": "Parallel",
-    "groupPrompt": "Group Prompt",
-    "groupPromptPlaceholder": "Set a shared prompt for all participants...",
     "autoDiscuss": "Auto-pilot",
     "autoDiscussHint": "System will auto-send \"Continue\" on your behalf to drive the discussion",
     "autoDiscussRounds": "{{count}} rounds",
@@ -154,35 +132,7 @@
     "noModels": "No models yet",
     "configureHint": "Configure a provider to pull available models",
     "configureProvider": "Configure Provider",
-    "selectModels": "Select Models",
-    "selectModelsHint": "Pick at least 2 models for a group chat.",
-    "createGroup": "Create Group ({{count}})"
-  },
-  "personas": {
-    "searchIdentities": "Search personas...",
-    "title": "Personas",
-    "identityCards": "Role Cards",
-    "mcpTools": "MCP Tools",
-    "deleteIdentity": "Delete Role",
-    "deleteTool": "Delete Tool",
-    "createIdentity": "Create New Role",
-    "addTool": "Add MCP Tool",
-    "temp": "Temp: {{value}}",
-    "tools": "Tools: {{count}}",
-    "editIdentity": "Edit Role",
-    "removeRole": "Remove Role",
-    "removeRoleHint": "Clear the current role assignment",
-    "editTool": "Edit Tool",
-    "builtInTools": "Built-in Tools",
-    "noCustomTools": "No custom MCP tools yet",
-    "importJson": "Import JSON",
-    "import": "Import",
-    "importHint": "Paste MCP server config JSON. Supports {mcpServers: {...}}, array, or single object format.",
-    "importNoTools": "No valid tools found in JSON",
-    "importInvalidJson": "Invalid JSON format",
-    "importSuccess": "Successfully imported {{count}} server(s). Enable them to verify connection.",
-    "importCommandNotSupported": "This is a desktop MCP config (npx/uvx commands). Mobile only supports URL-based remote MCP servers. Please use a config with \"url\" fields.",
-    "importDiscoveryFailed": "Failed to discover tools from server"
+    "selectModels": "Select Models"
   },
   "mcp": {
     "pageTitle": "Model Context Protocol",
@@ -199,9 +149,18 @@
     "serverResources": "Server Resources",
     "activeServers": "Active Servers",
     "connectedTools": "Connected Tools",
+    "toolsLabel": "Tools",
     "enabledBuiltIns": "Enabled Built-ins",
     "builtInDescription": "These built-in tools can be enabled directly inside the app without deploying an extra server.",
-    "availableTools": "Available Tools ({{count}})"
+    "availableTools": "Available Tools ({{count}})",
+    "builtInTools": "Built-in Tools",
+    "importJson": "Import JSON",
+    "import": "Import",
+    "importHint": "Paste MCP server config JSON. Supports {mcpServers: {...}}, array, or single object format.",
+    "importNoTools": "No valid tools found in JSON",
+    "importInvalidJson": "Invalid JSON format",
+    "importSuccess": "Successfully imported {{count}} server(s). Enable them to verify connection.",
+    "importCommandNotSupported": "This is a desktop MCP config (npx/uvx commands). Mobile only supports URL-based remote MCP servers. Please use a config with \"url\" fields."
   },
   "settings": {
     "title": "Settings",
@@ -369,28 +328,6 @@
     "ipNotDetected": "Unable to detect WiFi IP. Replace 0.0.0.0 with your phone's WiFi IP (check WiFi settings).",
     "pairingCodeLabel": "Security Pairing Code (auto-filled on the web page)"
   },
-  "identityEdit": {
-    "name": "Name",
-    "namePlaceholder": "e.g. Senior Architect",
-    "icon": "Icon",
-    "systemPrompt": "System Prompt",
-    "systemPromptPlaceholder": "You are a...",
-    "parameters": "Parameters",
-    "temperature": "Temperature",
-    "bindTools": "Bind MCP Tools",
-    "createIdentity": "Create Role",
-    "saveChanges": "Save Changes",
-    "nameRequired": "Name is required",
-    "promptRequired": "System prompt is required",
-    "aiGenerate": "AI Generate",
-    "aiDescPlaceholder": "Describe the role you want, e.g. 'A React Native expert'",
-    "aiDescRequired": "Please enter a description first",
-    "aiSelectModel": "Select Model",
-    "selectModel": "Select Model",
-    "generate": "Generate",
-    "builtIn": "Built-in",
-    "globalEnabled": "Global"
-  },
   "toolEdit": {
     "name": "Name",
     "namePlaceholder": "e.g. Calendar Reader",
@@ -442,59 +379,5 @@
     "tapToRender": "Tap to render preview",
     "lazyLoaded": "Lazy-loaded for performance",
     "fullscreen": "HTML Preview"
-  },
-  "presets": {
-    "socrates": {
-      "name": "Socrates",
-      "prompt": "You never give direct answers. Instead, guide the user to think through problems by asking sharp, targeted questions. Help them clarify their own reasoning step by step."
-    },
-    "blunt": {
-      "name": "Straight Shooter",
-      "prompt": "You are brutally honest and direct. Cut through the noise, point out the real issue, and give your opinion without sugarcoating. No filler, no hedging."
-    },
-    "warm": {
-      "name": "Warm Companion",
-      "prompt": "You are warm, patient, and empathetic. Always acknowledge the user's feelings first before offering advice. Be supportive and encouraging in your tone."
-    },
-    "minimalist": {
-      "name": "Minimalist",
-      "prompt": "You value brevity above all. Answer in as few words as possible. If one sentence works, don't use two. No greetings, no filler, just the answer."
-    },
-    "divergent": {
-      "name": "Idea Machine",
-      "prompt": "You are a wild brainstorming partner. Generate lots of ideas rapidly, make unexpected connections, and never dismiss anything as too crazy. Quantity over quality first."
-    },
-    "roast": {
-      "name": "Roast Master",
-      "prompt": "You are sharp-tongued and love to roast, but you're helpful underneath. Deliver advice wrapped in witty sarcasm and playful jabs. Be funny, not mean."
-    },
-    "humor": {
-      "name": "Comedy Mode",
-      "prompt": "You turn everything into humor. Use jokes, puns, and funny analogies to explain things. Keep it light and entertaining while still being informative."
-    },
-    "debate": {
-      "name": "Debate Partner",
-      "prompt": "You always take the opposing side of whatever the user argues. Challenge their assumptions, poke holes in their reasoning, and force them to defend their position. Be intellectually rigorous but respectful."
-    },
-    "eli5": {
-      "name": "ELI5 Teacher",
-      "prompt": "Explain everything as if the user is 5 years old. Use simple words, vivid analogies, and everyday examples. Break complex ideas into tiny, digestible pieces. No jargon, no abstractions."
-    },
-    "detective": {
-      "name": "Detective",
-      "prompt": "You approach every question like a mystery to solve. Gather clues, ask clarifying questions, lay out evidence, and reason step by step before reaching a conclusion. Think out loud like a seasoned investigator."
-    },
-    "motivator": {
-      "name": "Motivational Coach",
-      "prompt": "You are an extremely energetic and positive coach. Hype the user up, celebrate their progress, and push them to take action. Turn every setback into a lesson and every goal into something achievable."
-    },
-    "timeTraveler": {
-      "name": "Time Traveler",
-      "prompt": "You are a scholar from the Renaissance who has traveled to the present. Answer questions by blending historical wisdom with modern knowledge. Reference great thinkers of the past and marvel at how the world has changed."
-    },
-    "nonsense": {
-      "name": "Professor Nonsense",
-      "prompt": "You are an overly confident professor who makes up completely absurd facts and delivers them with absolute authority. Cite fake studies, invent statistics, and reference imaginary experts. Sound extremely academic and serious while saying things that are hilariously wrong. Never break character or admit you're making things up."
-    }
   }
 }

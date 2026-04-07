@@ -8,7 +8,7 @@ import { GitBranch, Paperclip } from "lucide-react";
 import { ChatInput } from "./ChatInput";
 import { useChatStore, type ChatState } from "../../stores/chat-store";
 import { useMessages, useConversation } from "../../hooks/useDatabase";
-import type { ConversationParticipant, ReasoningEffort } from "../../types";
+import type { ReasoningEffort } from "../../types";
 import { MessageStatus } from "../../types";
 import { useConfirm } from "./ConfirmDialogProvider";
 import { useStickToBottom } from "use-stick-to-bottom";
@@ -37,8 +37,6 @@ interface ChatViewProps {
   onSwitchModel?: () => void;
   reasoningEffort?: ReasoningEffort | undefined;
   onSelectReasoningEffort?: (value: ReasoningEffort | undefined) => void;
-  isGroup?: boolean;
-  participants?: ConversationParticipant[];
   keyboardInset?: number;
 }
 
@@ -51,8 +49,6 @@ export function ChatView({
   onSwitchModel,
   reasoningEffort,
   onSelectReasoningEffort,
-  isGroup = false,
-  participants = [],
   keyboardInset = 0,
 }: ChatViewProps) {
   const { t, i18n } = useTranslation();
@@ -138,8 +134,6 @@ export function ChatView({
           role: "assistant",
           senderModelId: null,
           senderName: "",
-          identityId: null,
-          participantId: null,
           content: sm.content,
           images: [],
           generatedImages: [],
@@ -167,12 +161,12 @@ export function ChatView({
   }, [displayMessages]);
 
   const handleSend = useCallback(
-    (text: string, mentionedParticipantIds?: string[], images?: string[]) => {
+    (text: string, images?: string[]) => {
       // Use "instant" animation + ignoreEscapes to lock scroll to bottom
       // throughout the entire send → stream cycle, preventing race conditions
       // where isAtBottom becomes false between message insert and DOM render.
       scrollToBottom({ animation: "instant", ignoreEscapes: true, duration: 500 });
-      sendMessage(text, images, { mentionedParticipantIds });
+      sendMessage(text, images);
     },
     [sendMessage, scrollToBottom],
   );
@@ -285,8 +279,6 @@ export function ChatView({
           onSelectReasoningEffort={onSelectReasoningEffort}
           modelName={modelName}
           onSwitchModel={onSwitchModel}
-          isGroup={isGroup}
-          participants={participants}
           hasMessages={false}
           keyboardInset={keyboardInset}
           onStartAutoDiscuss={startAutoDiscuss}
@@ -360,8 +352,6 @@ export function ChatView({
         onSelectReasoningEffort={onSelectReasoningEffort}
         modelName={modelName}
         onSwitchModel={onSwitchModel}
-        isGroup={isGroup}
-        participants={participants}
         hasMessages={hasMessages}
         keyboardInset={keyboardInset}
         onStartAutoDiscuss={startAutoDiscuss}

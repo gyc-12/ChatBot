@@ -1,4 +1,4 @@
-import type { Conversation, ConversationParticipant } from "../types";
+import type { Conversation } from "../types";
 import {
   deleteConversation as dbDeleteConversation,
   deleteAllConversations as dbDeleteAllConversations,
@@ -9,64 +9,29 @@ import { useProviderStore } from "./provider-store";
 import { generateId } from "../lib/id";
 import i18n from "../i18n";
 import type { StreamingState } from "./chat-generation";
+import { createSingleConversationDraft } from "../lib/conversation-single";
 
-export function autoTitle(participants: ConversationParticipant[]): string {
+export function autoTitle(modelId: string): string {
   const providerStore = useProviderStore.getState();
-  const names = participants.map(
-    (participant) =>
-      providerStore.getModelById(participant.modelId)?.displayName ?? participant.modelId,
-  );
-  if (names.length <= 1) return names[0] ?? "";
-  return names.length <= 3 ? names.join(", ") : `${names.slice(0, 3).join(", ")}...`;
+  return providerStore.getModelById(modelId)?.displayName ?? modelId;
 }
 
-export function getDefaultConversationTitle(
-  participants: ConversationParticipant[],
-  fallbackModelId?: string,
-): string {
+export function getDefaultConversationTitle(modelId?: string): string {
   const providerStore = useProviderStore.getState();
-  if (participants.length > 1) return autoTitle(participants);
-  const modelId = participants[0]?.modelId ?? fallbackModelId ?? "";
   return (
-    providerStore.getModelById(modelId)?.displayName ??
+    (modelId ? providerStore.getModelById(modelId)?.displayName : null) ??
     i18n.t("chats.newChat", { defaultValue: "New Chat" })
   );
 }
 
-export function createConversationDraft(
-  modelId: string,
-  extraModelIds?: string[],
-  membersWithIdentity?: { modelId: string; identityId: string | null }[],
-): Conversation {
-  let participants: ConversationParticipant[];
-
-  if (membersWithIdentity && membersWithIdentity.length > 0) {
-    participants = membersWithIdentity.map((member) => ({
-      id: generateId(),
-      modelId: member.modelId,
-      identityId: member.identityId,
-    }));
-  } else {
-    const allIds = [modelId, ...(extraModelIds ?? [])];
-    participants = allIds.map((id) => ({
-      id: generateId(),
-      modelId: id,
-      identityId: null,
-    }));
-  }
-
-  const isGroup = participants.length > 1;
-  return {
+export function createConversationDraft(modelId: string): Conversation {
+  const now = new Date().toISOString();
+  return createSingleConversationDraft({
     id: generateId(),
-    type: isGroup ? "group" : "single",
-    title: getDefaultConversationTitle(participants, modelId),
-    participants,
-    lastMessage: null,
-    lastMessageAt: null,
-    pinned: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+    modelId,
+    title: getDefaultConversationTitle(modelId),
+    now,
+  });
 }
 
 export async function persistConversationRecord(conversation: Conversation): Promise<void> {
@@ -76,10 +41,8 @@ export async function persistConversationRecord(conversation: Conversation): Pro
 
 export async function createConversationRecord(
   modelId: string,
-  extraModelIds?: string[],
-  membersWithIdentity?: { modelId: string; identityId: string | null }[],
 ): Promise<Conversation> {
-  const conversation = createConversationDraft(modelId, extraModelIds, membersWithIdentity);
+  const conversation = createConversationDraft(modelId);
 
   await persistConversationRecord(conversation);
   return conversation;

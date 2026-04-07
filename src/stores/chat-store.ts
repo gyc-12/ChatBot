@@ -4,19 +4,10 @@
  * Generation logic extracted to chat-generation.ts.
  */
 import { create } from "zustand";
-import type {
-  Message,
-  Conversation,
-  ConversationParticipant,
-  SpeakingOrder,
-  ReasoningEffort,
-} from "../types";
-import { getConversation } from "../storage/database";
-import { generateId } from "../lib/id";
+import type { Message, Conversation, ReasoningEffort } from "../types";
 import { type StreamingState } from "./chat-generation";
 import { dispatchMessageGeneration, runAutoDiscuss } from "./chat-dispatch";
 import {
-  autoTitle,
   createConversationDraft,
   deleteConversationRecord,
   deleteAllConversationRecords,
@@ -26,27 +17,19 @@ import {
   stopConversationGeneration,
 } from "./chat-store-core";
 import {
-  addParticipant,
-  addParticipants,
   branchFromMessage,
   clearConversationMessages,
   deleteMessageById,
   duplicateConversation,
   editUserMessage,
   regenerateAssistantMessage,
-  removeParticipant,
   renameConversation,
-  reorderParticipants,
   searchAllMessages,
   togglePinConversation,
-  updateGroupSystemPrompt,
-  updateParticipantIdentity,
-  updateParticipantModel,
-  updateParticipantReasoningEffort,
-  updateSpeakingOrder,
+  updateConversationModel,
+  updateConversationReasoningEffort,
 } from "./chat-store-actions";
 
-// Per-conversation generation tracking (module-level to avoid zustand serialization)
 const _abortControllers = new Map<string, AbortController>();
 const _streamingMessages = new Map<string, StreamingState>();
 
@@ -57,15 +40,8 @@ export interface ChatState {
   autoDiscussRemaining: number;
   autoDiscussTotalRounds: number;
   draftConversations: Record<string, Conversation>;
-
-  // In-memory streaming state — not persisted, used for rAF updates
   streamingMessages: StreamingState[];
-
-  createConversation: (
-    modelId: string,
-    extraModelIds?: string[],
-    membersWithIdentity?: { modelId: string; identityId: string | null }[],
-  ) => Promise<Conversation>;
+  createConversation: (modelId: string) => Promise<Conversation>;
   deleteConversation: (id: string) => Promise<void>;
   deleteAllConversations: () => Promise<void>;
   setCurrentConversation: (id: string | null) => void;
@@ -74,8 +50,6 @@ export interface ChatState {
     images?: string[],
     options?: {
       reuseUserMessageId?: string;
-      mentionedParticipantIds?: string[];
-      targetParticipantIds?: string[];
       contextUntilMessageId?: string;
     },
   ) => Promise<void>;
@@ -90,34 +64,11 @@ export interface ChatState {
   deleteMessageById: (messageId: string) => Promise<void>;
   clearConversationMessages: (conversationId: string) => Promise<void>;
   searchAllMessages: (query: string) => Promise<Message[]>;
-  updateParticipantIdentity: (
-    conversationId: string,
-    participantId: string,
-    identityId: string | null,
-  ) => Promise<void>;
-  updateParticipantModel: (
-    conversationId: string,
-    participantId: string,
-    modelId: string,
-  ) => Promise<void>;
-  addParticipant: (
-    conversationId: string,
-    modelId: string,
-    identityId?: string | null,
-  ) => Promise<void>;
-  addParticipants: (
-    conversationId: string,
-    members: { modelId: string; identityId: string | null }[],
-  ) => Promise<void>;
-  removeParticipant: (conversationId: string, participantId: string) => Promise<void>;
+  updateConversationModel: (conversationId: string, modelId: string) => Promise<void>;
   renameConversation: (conversationId: string, title: string) => Promise<void>;
   togglePinConversation: (conversationId: string) => Promise<void>;
-  updateSpeakingOrder: (conversationId: string, order: SpeakingOrder) => Promise<void>;
-  updateGroupSystemPrompt: (conversationId: string, prompt: string) => Promise<void>;
-  reorderParticipants: (conversationId: string, participantIds: string[]) => Promise<void>;
-  updateParticipantReasoningEffort: (
+  updateConversationReasoningEffort: (
     conversationId: string,
-    participantId: string,
     reasoningEffort: ReasoningEffort | undefined,
   ) => Promise<void>;
 }
@@ -131,16 +82,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   streamingMessages: [],
   draftConversations: {},
 
-  createConversation: async (
-    modelId: string,
-    extraModelIds?: string[],
-    membersWithIdentity?: { modelId: string; identityId: string | null }[],
-  ) => {
-    const conversation = createConversationDraft(modelId, extraModelIds, membersWithIdentity);
-    set((state) => ({
+  createConversation: async (modelId: string) => {
+    const conversation = createConversationDraft(modelId);
+    set(() => ({
       currentConversationId: conversation.id,
       draftConversations: {
-        // Only keep the fresh draft to avoid leaving abandoned blank conversations in memory.
         [conversation.id]: conversation,
       },
     }));
@@ -202,8 +148,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     images?: string[],
     options?: {
       reuseUserMessageId?: string;
-      mentionedParticipantIds?: string[];
-      targetParticipantIds?: string[];
       contextUntilMessageId?: string;
     },
   ) => {
@@ -291,158 +235,26 @@ export const useChatStore = create<ChatState>((set, get) => ({
     await clearConversationMessages(conversationId);
   },
 
-  updateParticipantIdentity: async (
-    conversationId: string,
-    participantId: string,
-    identityId: string | null,
-  ) => {
+  updateConversationModel: async (conversationId: string, modelId: string) => {
     const draft = get().draftConversations[conversationId];
     if (draft) {
-      const participants = draft.participants.map((participant) =>
-        participant.id === participantId ? { ...participant, identityId } : participant,
-      );
-      const previousAutoTitle = getDefaultConversationTitle(draft.participants);
-      const nextTitle =
-        draft.title === previousAutoTitle ? getDefaultConversationTitle(participants) : draft.title;
       set((state) => ({
         draftConversations: {
           ...state.draftConversations,
           [conversationId]: {
             ...draft,
-            participants,
-            title: nextTitle,
+            modelId,
+            title:
+              draft.title === getDefaultConversationTitle(draft.modelId)
+                ? getDefaultConversationTitle(modelId)
+                : draft.title,
             updatedAt: new Date().toISOString(),
           },
         },
       }));
       return;
     }
-    await updateParticipantIdentity(conversationId, participantId, identityId);
-  },
-
-  updateParticipantModel: async (
-    conversationId: string,
-    participantId: string,
-    modelId: string,
-  ) => {
-    const draft = get().draftConversations[conversationId];
-    if (draft) {
-      const participants = draft.participants.map((participant) =>
-        participant.id === participantId ? { ...participant, modelId } : participant,
-      );
-      const previousAutoTitle = getDefaultConversationTitle(draft.participants);
-      const nextTitle =
-        draft.title === previousAutoTitle ? getDefaultConversationTitle(participants) : draft.title;
-      set((state) => ({
-        draftConversations: {
-          ...state.draftConversations,
-          [conversationId]: {
-            ...draft,
-            participants,
-            title: nextTitle,
-            updatedAt: new Date().toISOString(),
-          },
-        },
-      }));
-      return;
-    }
-    await updateParticipantModel(conversationId, participantId, modelId);
-  },
-
-  addParticipant: async (conversationId: string, modelId: string, identityId?: string | null) => {
-    const draft = get().draftConversations[conversationId];
-    if (draft) {
-      const participants: ConversationParticipant[] = [
-        ...draft.participants,
-        { id: generateId(), modelId, identityId: identityId ?? null },
-      ];
-      const previousAutoTitle =
-        draft.participants.length > 1
-          ? autoTitle(draft.participants)
-          : getDefaultConversationTitle(draft.participants);
-      const nextTitle =
-        draft.title === previousAutoTitle ? getDefaultConversationTitle(participants) : draft.title;
-      set((state) => ({
-        draftConversations: {
-          ...state.draftConversations,
-          [conversationId]: {
-            ...draft,
-            participants,
-            type: participants.length > 1 ? "group" : "single",
-            title: nextTitle,
-            updatedAt: new Date().toISOString(),
-          },
-        },
-      }));
-      return;
-    }
-    await addParticipant(conversationId, modelId, identityId);
-  },
-
-  addParticipants: async (
-    conversationId: string,
-    members: { modelId: string; identityId: string | null }[],
-  ) => {
-    const draft = get().draftConversations[conversationId];
-    if (draft) {
-      const participants: ConversationParticipant[] = [
-        ...draft.participants,
-        ...members.map((member) => ({
-          id: generateId(),
-          modelId: member.modelId,
-          identityId: member.identityId,
-        })),
-      ];
-      const previousAutoTitle =
-        draft.participants.length > 1
-          ? autoTitle(draft.participants)
-          : getDefaultConversationTitle(draft.participants);
-      const nextTitle =
-        draft.title === previousAutoTitle ? getDefaultConversationTitle(participants) : draft.title;
-      set((state) => ({
-        draftConversations: {
-          ...state.draftConversations,
-          [conversationId]: {
-            ...draft,
-            participants,
-            type: participants.length > 1 ? "group" : "single",
-            title: nextTitle,
-            updatedAt: new Date().toISOString(),
-          },
-        },
-      }));
-      return;
-    }
-    await addParticipants(conversationId, members);
-  },
-
-  removeParticipant: async (conversationId: string, participantId: string) => {
-    const draft = get().draftConversations[conversationId];
-    if (draft) {
-      const participants = draft.participants.filter(
-        (participant) => participant.id !== participantId,
-      );
-      const previousAutoTitle =
-        draft.participants.length > 1
-          ? autoTitle(draft.participants)
-          : getDefaultConversationTitle(draft.participants);
-      const nextTitle =
-        draft.title === previousAutoTitle ? getDefaultConversationTitle(participants) : draft.title;
-      set((state) => ({
-        draftConversations: {
-          ...state.draftConversations,
-          [conversationId]: {
-            ...draft,
-            participants,
-            type: participants.length > 1 ? "group" : "single",
-            title: nextTitle,
-            updatedAt: new Date().toISOString(),
-          },
-        },
-      }));
-      return;
-    }
-    await removeParticipant(conversationId, participantId);
+    await updateConversationModel(conversationId, modelId);
   },
 
   renameConversation: async (conversationId: string, title: string) => {
@@ -481,91 +293,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
     await togglePinConversation(conversationId);
   },
 
-  updateSpeakingOrder: async (conversationId: string, order) => {
-    const draft = get().draftConversations[conversationId];
-    if (draft) {
-      set((state) => ({
-        draftConversations: {
-          ...state.draftConversations,
-          [conversationId]: {
-            ...draft,
-            speakingOrder: order,
-            updatedAt: new Date().toISOString(),
-          },
-        },
-      }));
-      return;
-    }
-    await updateSpeakingOrder(conversationId, order);
-  },
-
-  updateGroupSystemPrompt: async (conversationId: string, prompt: string) => {
-    const draft = get().draftConversations[conversationId];
-    if (draft) {
-      set((state) => ({
-        draftConversations: {
-          ...state.draftConversations,
-          [conversationId]: {
-            ...draft,
-            groupSystemPrompt: prompt,
-            updatedAt: new Date().toISOString(),
-          },
-        },
-      }));
-      return;
-    }
-    await updateGroupSystemPrompt(conversationId, prompt);
-  },
-
-  reorderParticipants: async (conversationId: string, participantIds: string[]) => {
-    const draft = get().draftConversations[conversationId];
-    if (draft) {
-      const participantMap = new Map(
-        draft.participants.map((participant) => [participant.id, participant]),
-      );
-      const participants = participantIds
-        .map((participantId) => participantMap.get(participantId))
-        .filter((participant): participant is ConversationParticipant => !!participant);
-      if (participants.length === draft.participants.length) {
-        set((state) => ({
-          draftConversations: {
-            ...state.draftConversations,
-            [conversationId]: {
-              ...draft,
-              participants,
-              updatedAt: new Date().toISOString(),
-            },
-          },
-        }));
-      }
-      return;
-    }
-    await reorderParticipants(conversationId, participantIds);
-  },
-
-  updateParticipantReasoningEffort: async (
+  updateConversationReasoningEffort: async (
     conversationId: string,
-    participantId: string,
     reasoningEffort: ReasoningEffort | undefined,
   ) => {
     const draft = get().draftConversations[conversationId];
     if (draft) {
-      const participants = draft.participants.map((participant) =>
-        participant.id === participantId ? { ...participant, reasoningEffort } : participant,
-      );
       set((state) => ({
         draftConversations: {
           ...state.draftConversations,
           [conversationId]: {
             ...draft,
-            participants,
+            reasoningEffort,
             updatedAt: new Date().toISOString(),
           },
         },
       }));
       return;
     }
-    await updateParticipantReasoningEffort(conversationId, participantId, reasoningEffort);
+    await updateConversationReasoningEffort(conversationId, reasoningEffort);
   },
 
   branchFromMessage: async (messageId: string, messages: Message[]) => {
