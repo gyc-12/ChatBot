@@ -96,6 +96,46 @@ export default function App() {
     refreshMcpConnections().catch((err) => console.warn("[App] MCP refresh failed:", err));
   }, [ready, enabledMcpSignature]);
 
+  useEffect(() => {
+    if (!ready) return;
+
+    let lastHiddenAt = 0;
+
+    const restoreFromBackground = () => {
+      lastHiddenAt = 0;
+      useSettingsStore.getState().loadFromStorage();
+      useProviderStore.getState().loadFromStorage();
+      useMcpStore.getState().loadFromStorage();
+      useBuiltInToolsStore.getState().loadFromStorage();
+      refreshMcpConnections().catch((err) => console.warn("[App] MCP resume refresh failed:", err));
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        lastHiddenAt = Date.now();
+        return;
+      }
+
+      if (lastHiddenAt > 0) {
+        restoreFromBackground();
+      }
+    };
+
+    const handlePageShow = () => {
+      if (lastHiddenAt > 0 || document.visibilityState === "visible") {
+        restoreFromBackground();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pageshow", handlePageShow);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pageshow", handlePageShow);
+    };
+  }, [ready]);
+
   return (
     <BrowserRouter>
       <ConfirmDialogProvider>
